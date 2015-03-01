@@ -10,7 +10,7 @@ from matplotlib.colors import LogNorm
 
 polarization = 'HH'
 
-ifiles = glob.glob('S1A*.zip_%s_stats.npz' % polarization)
+ifiles = glob.glob('/files/sentinel1a/S1A*.zip_%s_stats.npz' % polarization)
 
 meanStds = []
 stds = []
@@ -59,6 +59,8 @@ swathsHH = {
 }
 
 swaths = {'HH': swathsHH, 'HV':swathsHV}[polarization]
+
+dEA = {'HH': 0.5, 'HV': 0.05} # each pixel is ca 0.002 deg
 
 swathData = []
 
@@ -113,7 +115,7 @@ for swath in swaths:
     s0StdMax1 = {'HH': 0.4,  'HV': 0.002}[polarization]
     s0StdMax2 = {'HH': 0.02,  'HV': 0.001}[polarization]
 
-	
+
     tmp = plt.hist2d(eas, means, (bins, bins), norm=LogNorm(vmin=dmin, vmax=dmax), range=[[minEA, maxEA], [0, s0MeanMax1]])
 
     tmp = plt.subplot(322)
@@ -127,11 +129,10 @@ for swath in swaths:
     noiseEstim = goodMeans
 
     # simulated pixels
-    #%cpaste
-    dpix = {'HH': 0.1, 'HV': 0.05}[polarization] # each pixel is ca 0.002 deg
-    simPixels = (maxEA - minEA) / dpix
+    pixSize = dEA[polarization]
+    simPixels = (maxEA - minEA) / pixSize
     print 'simPixels = ', simPixels
-    eaSim = np.linspace(minEA, maxEA + dpix + dpix, simPixels)
+    eaSim = np.linspace(minEA, maxEA + pixSize + pixSize, simPixels)
 
     # MEDIAN for each simulated pixel
     noiseMed = []

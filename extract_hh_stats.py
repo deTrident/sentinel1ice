@@ -13,8 +13,10 @@ django.setup()
 
 from cat.models import Image
 
+odir = '/files/sentinel1a/'
+
 def extract_mean_HH(img):
-    ofile = img.sourcefile.name + '_HH_stats.npz'
+    ofile = os.path.join(odir, img.sourcefile.name + '_HH_stats.npz')
 
     if os.path.exists(ofile):
         print '%s already exists' % ofile
@@ -59,9 +61,9 @@ def extract_mean_HH(img):
 
 
 
-p = Polygon(((20, 83), (21, 83), (21, 84), (20, 84), (20, 83)))
+p = Polygon(((25, 84), (26, 84), (26, 85), (25, 85), (25, 84)))
 images = Image.objects.filter(border__intersects=p).filter(sourcefile__name__startswith='S1A_EW_GRDM_1SDH')
 print len(images)
 
 pool = Pool(4)
-pool.map(extract_mean_HH, images[::4])    
+pool.map(extract_mean_HH, images)

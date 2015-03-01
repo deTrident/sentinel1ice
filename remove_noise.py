@@ -10,24 +10,38 @@ from matplotlib.colors import LogNorm
 
 from nansat import *
 
-vmax = {'HH' : -5, 'HV' : -22}
-vmin = {'HH' : -20, 'HV' : -38}
+# remove thermal noise and anglura dependence from sigma0 in HH and HV of
+# several scence
+
+# min/max of sigma0 for non-corr and corrected values
+vmax = {'HH' : [-5, -5], 'HV' : [-18, -17]}
+vmin = {'HH' : [-25, -12], 'HV' : [-33, -23]}
+
 
 resizeFactor = 0.1
 
-s1afiles = glob.glob('*.SAFE')
+
+idir = '/files/sentinel1a/'
+s1afiles = sorted(glob.glob(idir + '*.SAFE'))
+odir = '/files/sentinel1a/'
+
+clims = {'HH': [], 'HV': []}
+
 for s1afile in s1afiles:
     print s1afile
-    ofile = os.path.splitext(s1afile)[0]
+    ofile = os.path.join(odir, os.path.splitext(os.path.split(s1afile)[1])[0])
     n = Nansat(s1afile)
     print 'open - OK'
-    n.resize(resizeFactor, eResampleAlg=0)
+    n.resize(resizeFactor, eResampleAlg=0) # nearest neighbour, just for test
     # load data from file
     eaMatrix = n['elevation_angle']
 
     for pol in ['HH', 'HV']:
         sigma0 = n['sigma0_%s' % pol]
-        plt.imsave(ofile + 'sigma0_%s.jpg' % pol, 10 * np.log10(sigma0), vmin=vmin[pol], vmax=vmax[pol], cmap='gray')
+        f = Figure(10 * np.log10(sigma0))
+        cmin, cmax = f.clim_from_histogram(ratio=0.95)
+        f.process(cmin=vmin[pol][0], cmax=vmax[pol][0], cmapName='gray')
+        f.save(ofile + 'sigma0_%s.jpg' % pol)
 
         # load noise from file
         s1aNoise = np.load('s1a_%s_thermal_noise.npz' % pol)
@@ -62,7 +76,9 @@ for s1afile in s1afiles:
         sigma0 = sigma0 - noiseMatrix
         del noiseMatrix
 
-        plt.imsave(ofile + 'sigma0_%scor.jpg' % pol, 10 * np.log10(sigma0), vmin=vmin[pol]+7, vmax=vmax[pol]+7, cmap='gray')
+        f = Figure(10 * np.log10(sigma0))
+        f.process(cmin=vmin[pol][1], cmax=vmax[pol][1], cmapName='gray')
+        f.save(ofile + 'sigma0_%scor.jpg' % pol)
         del sigma0
 
 
