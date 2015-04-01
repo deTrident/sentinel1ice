@@ -7,7 +7,7 @@ import scipy.interpolate as sp
 from nansat import Nansat
 
 class Sentinel1Image(Nansat):
-    ''' Noise removal, ice/water classification '''
+    ''' Apply angular correction and noise removeal to Sentinel1a SAR data '''
 
     def __getitem__(self, bandID):
         ''' Returns sigma0 corrected for thermal noise '''
@@ -40,6 +40,7 @@ class Sentinel1Image(Nansat):
         # get elevation angle and original sigma0 from Nansat
         eaMatrix = self['elevation_angle']
 
+        clearDataArray = np.zeros_like(dataArray) + np.nan
         # create noise matrix and fill with noise for eah swath
         for noiseArray in noiseArrays:
             minEA = np.nanmin(noiseArray[0])
@@ -52,11 +53,12 @@ class Sentinel1Image(Nansat):
             swathMask = (eaMatrix >= minEA) * (eaMatrix <= maxEA)
             noiseValues = fc(eaMatrix[swathMask])
 
-            dataArray[swathMask] = dataArray[swathMask] - noiseValues
+            clearDataArray[swathMask] = dataArray[swathMask] - noiseValues
             # free mem
             del noiseValues
             del swathMask
+
         del eaMatrix
 
-        return dataArray
-
+        # return data in decibels
+        return 10 * np.log10(clearDataArray)
