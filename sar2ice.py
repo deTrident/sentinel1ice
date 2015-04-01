@@ -112,33 +112,37 @@ def get_texture_features(iarray, ws, stp, threads):
     # reshape matrix and make images to be on the first dimension
     return np.swapaxes(harImageAnis.T, 1, 2)
 
-def normalize_texture_features(allTF, normFile):
+def normalize_texture_features(tfs, normFile):
     ''' Log-transform, center on mean and normalize by STD each TF
 
     Load from prepared file vlues of log-flag, mean and STD for each TF
     Parameters
     ----------
-        allTF : ndarray
-            2D matrix with all texture features [num_text_feat x num_pixels]
+        tfs : ndarray
+            3D matrix with all texture features [13 x rows x cols]
         normFile : str
             name of file with log-flag, mean and STD
     Returns
     -------
         newTF : ndarray
-            2D matrix with normalized texture features (same size, dtype)
+            3D matrix with normalized texture features (same size, dtype)
     '''
     # load log-flag, mean and STD
-    logMeanStd = np.load(normFile)
+    normCoefs = np.load(normFile)
+    # make copy of tfs
+    tfsNorm = np.array(tfs)
 
-    # log-transform if needed some of the TFs
-    for i, tf in enumerate(allTF):
-        if logMeanStd[0, i] == 1:
-            allTF[i] = np.log10(allTF[i])
+    # log-transform or exp-transform if needed some of the TFs
+    for i, tfSkew in enumerate(normCoefs[0]):
+        if tfSkew > 2:
+            tfsNorm[i] = np.log10(tfsNorm[i] - normCoefs[1, i])
+        elif tfSkew < -2:
+            tfsNorm[i] = 10 ** (tfsNorm[i] - normCoefs[1, i])
 
-    # center and normalize to STD
-    allTF = (allTF - logMeanStd[1][None].T) / logMeanStd[2][None].T
+    # center at mean and normalize to STD
+    tfsNorm = (tfsNorm - normCoefs[2][None][None].T) / normCoefs[3][None][None].T
 
-    return allTF
+    return tfsNorm
 
 def apply_svm(allTF, svmFile, threads):
     ''' Apply SVM to normalized texture features and lable each vector
@@ -182,18 +186,18 @@ def apply_svm(allTF, svmFile, threads):
 
 def get_map(s1i, bands, vmin, vmax,
                 l=64, ws=32, stp=32, threads=2,
-                normFile=None, svmFile=None):
+                normFiles=None, svmFile=None):
     '''Get raster map with classification results
 
     Parameters
     ----------
         s1i : Sentinel1Image
             Nansat chiled with SAR data
-        bands : list/tuple of strings or integers
+        bands : list of strings or integers
             IDs of bands to calculate texture features from
-        vmin : list/tuple of floats
+        vmin : list of floats
             minimum values used for scaling to gray levesl
-        vmax : list/tuple of floats
+        vmax : list of floats
             maximum values used for scaling to gray levesl
         l : int
             number of gray levels
@@ -203,7 +207,7 @@ def get_map(s1i, bands, vmin, vmax,
             step of sub-window floating
         threads : int
             number of parallell processes
-        normFile : str
+        normFiles : list of str
             name of file to use for normalization of texture features
         svmFile : str
             name of file where SVM is stored
@@ -232,18 +236,17 @@ def get_map(s1i, bands, vmin, vmax,
         # get texture features
         tf = get_texture_features(bandArray, ws, stp, threads)
 
+        # normalize texture features
+        tf = normalize_texture_features(allTF, normFiles[i])
+
         # append texture features as 2D matrix [13 x total_size]
-        allTF.append(tf.reshape(tf.shape[0], tf.shape[1]*tf.shape[2]))
+        allTF.append(tf)
 
-    # stack texture features from all bands into single 2D matrix
-    # if two input bands only (e.g. HH and HV), size is [26 x total_size]
-    allTF = np.vstack(allTF)
-
-    # normalize texture features
-    allTF = normalize_texture_features(allTF, normFile)
+    # stack texture features from all bands into single 3D matrix
+    # if two input bands only (e.g. HH and HV), size is [26 x rows x cols]
+    allTF = np.dstack(allTF)
 
     # apply SVM
     lables = apply_svm(allTF, svmFile)
 
-    # reshape vector of labels into 2D raster map
-    return lables.reshape(tf.shape[1], tf.shape[2])
+    return lables

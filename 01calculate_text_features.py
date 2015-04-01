@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import mahotas
 
 from sentinel1image import Sentinel1Image
-from sar2ice import *
+from sar2ice import convert2gray, get_texture_features
 
 # find input files
 idir = '/files/sentinel1a/'
@@ -36,7 +36,7 @@ for ifilepath in ifiles:
 
         # read data from input file
         s1i = Sentinel1Image(idir + ifile)
-        s1i.crop(2000, 2000, 1000, 1000)  # for testing only
+        #s1i.crop(2000, 2000, 1000, 1000)  # for testing only
         print 'Read sigma0_%s from %s' % (pol, ifile)
         sigma0 = s1i['sigma0_%s' % pol]
 
