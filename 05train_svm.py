@@ -18,7 +18,7 @@ def clf_predict(inputData):
 
 
 idir = '/files/sentinel1a/odata/'
-myZonesSuffix = '_my_zones_x8.png'
+myZonesSuffix = '_my_zones.png'
 zoneColors = [0, 255]
 n_threads = 6
 svmFileName = 'svm_test0.pickle'
@@ -34,8 +34,8 @@ for ifileHH in ifilesHH:
     if not os.path.exists(ifileMyZones):
         continue
     print ifileHH, ifileHV, ifileMyZones
-    hhTF = np.load(ifileHH)['newTFDataHH']
-    hvTF = np.load(ifileHV)['newTFDataHV']
+    hhTF = np.load(ifileHH)['tfsNorm']
+    hvTF = np.load(ifileHV)['tfsNorm']
     # read the image with my classification
     myZonesImg = np.array(Image.open(ifileMyZones))
     # resize from GIMP resolution back to original size
@@ -71,7 +71,7 @@ allDataGood = allData[:, gpi]
 randIndeces = np.random.permutation(allDataGood.shape[1])
 print len(randIndeces)
 # training and testing data
-maxSize = 10000
+maxSize = 1000
 trnIndeces = randIndeces[:maxSize]
 tstIndeces = randIndeces[maxSize:maxSize+maxSize]
 
@@ -104,7 +104,7 @@ print 'Apply SVM to %d vectors' % allDataGood.shape[1]
 pool = Pool(n_threads)
 
 # split good data into chunks for parallel processing
-chunkSize = 1000
+chunkSize = 100000
 allDataGoodChunks = [allDataGood[:26, i:i+chunkSize].T for i in range(0, allDataGood.shape[1], chunkSize)]
 
 # run parallel processing of all data with SVM
@@ -118,7 +118,7 @@ svmZonesAll[gpi] = svmZonesGood
 # convert to results to processed images
 startPix = 0
 for ifileHH in goodFiles:
-    hhTF = np.load(ifileHH)['newTFDataHH']
+    hhTF = np.load(ifileHH)['tfsNorm']
     imgSize = hhTF.shape[1] * hhTF.shape[2]
     print hhTF.shape[1], hhTF.shape[2], imgSize
     svmZones = svmZonesAll[startPix:startPix+imgSize].reshape(hhTF.shape[1], hhTF.shape[2])
