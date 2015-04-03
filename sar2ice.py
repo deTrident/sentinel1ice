@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import mahotas
 import pickle
 from sklearn import svm
-
+clf = None
 def call_haralick(subimage):
     ''' Caluculate Haralick texture features from a square subimage
 
@@ -32,6 +32,7 @@ def clf_predict(inputData):
     ''' Apply svm on some input data
     The is used for easy pickling (needed for multiprocessing)
     '''
+    global clf
     return clf.predict(inputData)
 
 
@@ -144,13 +145,13 @@ def normalize_texture_features(tfs, normFile):
 
     return tfsNorm
 
-def apply_svm(allTF, svmFile, threads):
+def apply_svm(tfs, svmFile, threads):
     ''' Apply SVM to normalized texture features and lable each vector
 
     Parameters
     ----------
-        allTF : ndarray
-            2D matrix with normalized texture features [num_text_feat, num_pixes]
+        tfs : ndarray
+            3D matrix with normalized texture features [features x rows x cols]
         svmFile : str
             name of file with pre-saved SVM
         threads : int
@@ -160,29 +161,33 @@ def apply_svm(allTF, svmFile, threads):
         labels : ndarray
             1D vector with labels for each vector (or np.nan)
     '''
-
+    global clf
     # load SVM from pre-saved file
     clf = pickle.load(open(svmFile, "rb" ))
 
+    # reshape input 3D cube [features x rows x cols] int 2D matrix [feats x total_size]
+    tfs2D = tfs.reshape(tfs.shape[0], tfs.shape[1] * tfs.shape[2])
+
     # find good data for processing (not NaN)
-    gpi = np.isfinite(allTF.sum(axis=0))
-    allTFGood = allTF[:, gpi]
+    gpi = np.isfinite(tfs2D.sum(axis=0))
+    tfsGood = tfs2D[:, gpi]
 
     # split good data into chunks for parallel processing
     chunkSize = 1000
-    allDataGoodChunks = [allTFGood[:, i:i+chunkSize].T
-                         for i in range(0, allTFGood.shape[1], chunkSize)]
+    tfsGoodChunks = [tfsGood[:, i:i+chunkSize].T
+                         for i in range(0, tfsGood.shape[1], chunkSize)]
 
     # run parallel processing of all data with SVM
     pool = Pool(threads)
-    svmLablesGood = pool.map(clf_predict, allDataGoodChunks)
+    svmLablesGood = pool.map(clf_predict, tfsGoodChunks)
 
     # join results back from the queue and insert into full matrix
     svmLabelsGood = np.hstack(svmLablesGood)
-    svmLabelsAll = np.zeros(allTF.shape[1]) + np.nan
+    svmLabelsAll = np.zeros(tfs2D.shape[1]) + np.nan
     svmLabelsAll[gpi] = svmLabelsGood
 
-    return svmLabelsAll
+    # reshape labels from vector into 2D raster map
+    return svmLabelsAll.reshape(tfs.shape[1], tfs.shape[2])
 
 def get_map(s1i, bands, vmin, vmax,
                 l=64, ws=32, stp=32, threads=2,
@@ -222,7 +227,7 @@ def get_map(s1i, bands, vmin, vmax,
     wm = s1i.watermask()[1]
 
     # container for texture features from all bands (e.g. both HH and HV)
-    allTF = []
+    tfs = []
     for i, bandName in enumerate(bands):
         # get array from the band
         bandArray = s1i[bandName]
@@ -237,16 +242,16 @@ def get_map(s1i, bands, vmin, vmax,
         tf = get_texture_features(bandArray, ws, stp, threads)
 
         # normalize texture features
-        tf = normalize_texture_features(allTF, normFiles[i])
+        tf = normalize_texture_features(tf, normFiles[i])
 
         # append texture features as 2D matrix [13 x total_size]
-        allTF.append(tf)
+        tfs.append(tf)
 
     # stack texture features from all bands into single 3D matrix
     # if two input bands only (e.g. HH and HV), size is [26 x rows x cols]
-    allTF = np.dstack(allTF)
+    tfs = np.vstack(tfs)
 
     # apply SVM
-    lables = apply_svm(allTF, svmFile)
+    lables = apply_svm(tfs, svmFile, threads)
 
     return lables
