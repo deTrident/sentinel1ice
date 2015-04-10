@@ -56,7 +56,7 @@ def convert2gray(iarray, vmin, vmax, l):
             2D matrix with values of gray levels in UINT8 format
     '''
     # convert to integer leves
-    iarray = 1 + l * (iarray - vmin) / (vmax - vmin)
+    iarray = 1 + (l - 1) * (iarray - vmin) / (vmax - vmin)
     iarray[iarray < 1] = 1
     iarray[iarray > l] = l
 

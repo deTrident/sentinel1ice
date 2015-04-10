@@ -30,4 +30,4 @@ for ifile in ifiles:
     iceMask = get_map(s2i, bands, vmin, vmax,
                     l, ws, stp, threads,
                     normFiles, svmFile)
-    plt.imsave(ifile + '_svm_zones_hires.png')
+    plt.imsave(ifile + '_svm_zones_hires.png', iceMask)
