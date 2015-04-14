@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as st
 import numpy as np
 
-import Image
+from PIL import Image
 
 from sklearn import svm
 from sar2ice import apply_svm

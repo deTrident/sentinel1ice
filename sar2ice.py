@@ -136,9 +136,9 @@ def normalize_texture_features(tfs, normFile):
     # log-transform or exp-transform if needed some of the TFs
     for i, tfSkew in enumerate(normCoefs[0]):
         if tfSkew > 2:
-            tfsNorm[i] = np.log10(tfsNorm[i] - normCoefs[1, i])
+            tfsNorm[i] = np.log10(tfsNorm[i] + normCoefs[1, i])
         elif tfSkew < -2:
-            tfsNorm[i] = 10 ** (tfsNorm[i] - normCoefs[1, i])
+            tfsNorm[i] = 10 ** (tfsNorm[i] + normCoefs[1, i])
 
     # center at mean and normalize to STD
     tfsNorm = (tfsNorm - normCoefs[2][None][None].T) / normCoefs[3][None][None].T
