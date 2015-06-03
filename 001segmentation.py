@@ -235,7 +235,12 @@ def get_segmented_tf(inputArray, windowSize=200,
 # find input files
 idir = '/files/sentinel1a/'
 odir = '/files/sentinel1a/odata/'
-ifiles = sorted(glob.glob(idir + '*.SAFE'))
+#ifiles = sorted(glob.glob(idir + '*.SAFE'))
+ifiles = [
+'/files/sentinel1a/S1A_EW_GRDM_1SDH_20150102T151324_20150102T151424_003994_004CF4_4924.SAFE',
+'/files/sentinel1a/S1A_EW_GRDM_1SDH_20150119T071200_20150119T071300_004237_005272_41A2.SAFE',
+'/files/sentinel1a/S1A_EW_GRDM_1SDH_20150330T072819_20150330T072919_005258_006A4F_EF40.SAFE',
+]
 
 
 ## parameers for segmetation
