@@ -23,8 +23,8 @@ threads = 6
 # if sigma0_max is None, only create histograms
 #sigma0_max = None
 #sigma0_min = None
-sigma0_max = {'HH': -3,  'HV': -15}
-sigma0_min = {'HH': -33, 'HV': -38}
+sigma0_max = {'HH': -3,  'HV': -17}
+sigma0_min = {'HH': -25, 'HV': -33}
 
 r1,r2 = 0,None # no crop
 c1,c2 = 0,None # no crop
