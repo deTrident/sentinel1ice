@@ -42,7 +42,7 @@ for pol in ['HH', 'HV']:
     tfOffsets = []
     for i, tf in enumerate(joinedTF):
         # transform to log if skewed
-        tfMedian = st.nanmedian(tf)
+        tfMedian = np.nanmedian(tf)
         tfMean = np.nanmean(tf)
         tfMin = np.nanmin(tf)
         tfMax = np.nanmax(tf)
