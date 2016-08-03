@@ -20,19 +20,16 @@ ws  = 32
 l   = 64
 threads = 6
 
-# if sigma0_max is not given,
-# only calculate statsistics
-sigma0_max = None
-sigma0_min = None
-
-#sigma0_max = {'HH': 0,   'HV': -14}
-#sigma0_min = {'HH': -15, 'HV': -26}
-
+# if sigma0_max is None, only create histograms
+#sigma0_max = None
+#sigma0_min = None
+sigma0_max = {'HH': -3,  'HV': -15}
+sigma0_min = {'HH': -33, 'HV': -38}
 
 r1,r2 = 0,None # no crop
 c1,c2 = 0,None # no crop
 
-# crop using the following limits:
+# crop using the following limits (uncomment for testing only)
 r1,r2 = 1000,5000
 c1,c2 = 1000,5000
 
@@ -42,15 +39,14 @@ for ifilepath in ifiles:
     for pol in ['HH', 'HV']:
         # set output file namew
         ofile = '%s_%s_' % (os.path.join(odir, ifile), pol)
-        ofileNPZ = ofile + 'har.npz'
+        ofileHAR = ofile + 'har.npz'
 
         # skip processing already extisting files
-        if os.path.exists(ofileNPZ):
+        if os.path.exists(ofileHAR):
             continue
 
-        # read data from input file
+        # read data from input S1 file
         s1i = Sentinel1Image(idir + ifile)
-        #s1i.crop(2000, 2000, 1000, 1000)  # for testing only
         print 'Read sigma0_%s from %s' % (pol, ifile)
         sigma0 = s1i['sigma0_%s' % pol]
         print 'Create watermask'
@@ -58,7 +54,7 @@ for ifilepath in ifiles:
         s1i = None
         del s1i
 
-        # crop
+        # crop (testing only)
         sigma0 = sigma0[r1:r2, c1:c2]
         wm = wm[r1:r2, c1:c2]
 
@@ -89,4 +85,4 @@ for ifilepath in ifiles:
         #     unsupervised classification,
         #     teaching SVM
         #     supervised classification)
-        np.savez_compressed(ofileNPZ, tfs=tfs)
+        np.savez_compressed(ofileHAR, tfs=tfs)
