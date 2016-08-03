@@ -18,9 +18,17 @@ ifiles = sorted(glob.glob(idir + '*.SAFE'))
 stp = 32
 ws  = 32
 l   = 64
-sigma0_max = {'HH': 0,   'HV': -14}
-sigma0_min = {'HH': -15, 'HV': -26}
 threads = 6
+
+# if sigma0_max is not given,
+# only calculate statsistics
+sigma0_max = None
+sigma0_min = None
+
+#sigma0_max = {'HH': 0,   'HV': -14}
+#sigma0_min = {'HH': -15, 'HV': -26}
+
+
 r1,r2 = 0,None # no crop
 c1,c2 = 0,None # no crop
 
@@ -53,6 +61,12 @@ for ifilepath in ifiles:
         # crop
         sigma0 = sigma0[r1:r2, c1:c2]
         wm = wm[r1:r2, c1:c2]
+
+        if sigma0_min is None or sigma0_max is None:
+            plt.hist(sigma0[(wm != 2) * np.isfinite(sigma0)], 100)
+            plt.savefig(ofile + 'sigma0_hist.jpg', dpi=100)
+            plt.close()
+            continue
 
         # make full res JPG
         plt.imsave(ofile + 'sigma0.jpg', sigma0, vmin=sigma0_min[pol], vmax=sigma0_max[pol], cmap='gray')
