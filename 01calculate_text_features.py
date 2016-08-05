@@ -26,16 +26,11 @@ threads = 6
 sigma0_max = {'HH': -3,  'HV': -17}
 sigma0_min = {'HH': -25, 'HV': -33}
 
-r1,r2 = 0,None # no crop
-c1,c2 = 0,None # no crop
-
-# crop using the following limits (uncomment for testing only)
-r1,r2 = 1000,5000
-c1,c2 = 1000,5000
 
 for ifilepath in ifiles:
     ifile = os.path.split(ifilepath)[1]
     print ifile
+    wm = None
     for pol in ['HH', 'HV']:
         # set output file namew
         ofile = '%s_%s_' % (os.path.join(odir, ifile), pol)
@@ -47,16 +42,17 @@ for ifilepath in ifiles:
 
         # read data from input S1 file
         s1i = Sentinel1Image(idir + ifile)
-        print 'Read sigma0_%s from %s' % (pol, ifile)
-        sigma0 = s1i['sigma0_%s' % pol]
-        print 'Create watermask'
-        wm = s1i.watermask()[1]
-        s1i = None
-        del s1i
+        s1i.add_denoised_band('sigma0_%s' % pol)
 
-        # crop (testing only)
-        sigma0 = sigma0[r1:r2, c1:c2]
-        wm = wm[r1:r2, c1:c2]
+        # for testsing only
+        s1i.crop(1000,1000, 2000, 2000)
+
+        print 'Read sigma0_%s from %s' % (pol, ifile)
+        sigma0 = s1i['sigma0_%s_denoised' % pol]
+
+        if wm is None:
+            print 'Create watermask'
+            wm = s1i.watermask()[1]
 
         if sigma0_min is None or sigma0_max is None:
             plt.hist(sigma0[(wm != 2) * np.isfinite(sigma0)], 100)
@@ -65,7 +61,8 @@ for ifilepath in ifiles:
             continue
 
         # make full res JPG
-        plt.imsave(ofile + 'sigma0.jpg', sigma0, vmin=sigma0_min[pol], vmax=sigma0_max[pol], cmap='gray')
+        s1i.write_figure(ofile + 'sigma0.jpg', 'sigma0_%s_denoised' % pol, clim=[sigma0_min[pol], sigma0_max[pol]], cmapName='gray')
+        del s1i
 
         # convert to integer leves
         sigma0 = convert2gray(sigma0, sigma0_min[pol], sigma0_max[pol], l)
