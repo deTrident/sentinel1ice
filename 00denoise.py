@@ -38,7 +38,7 @@ for ifilepath in ifiles:
             print 'Create watermask'
             results['wm'] = s1i.watermask()[1]
 
-        # make full res JPG
+        print 'Make full res JPG'
         jpgfile = '%s_%s.jpg' % (ofile, pol)
         if not os.path.exists(jpgfile):
             vmin = np.percentile(results['sigma0_%s_denoised' % pol][

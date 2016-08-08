@@ -44,7 +44,7 @@ for ifilepath in ifiles:
         sigma0 = np.load(ifilepath)['sigma0_%s_denoised' % pol]
 
         # create histograms
-        histfile = ofile + 'hist.jpg'
+        histfile = ofile + 'hist.png'
         if not os.path.exists(histfile):
             plt.hist(sigma0[(wm != 2) * np.isfinite(sigma0)], 100)
             plt.savefig(histfile, dpi=100)

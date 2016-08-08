@@ -84,7 +84,7 @@ for ifilepath in ifiles:
     # save full-size zones (zoom WS-times)
     labels_ms = np.zeros((labels.shape[0] + 1, labels.shape[1] + 1)) + np.nan
     labels_ms[:labels.shape[0], :labels.shape[1]] = labels
-    sigma0fs = plt.imread(ifilepath.replace('_har_norm.npz', '_sigma0.jpg'))
+    sigma0fs = plt.imread(ifilepath.replace('_har_norm.npz', '.jpg'))
     labels_fs = zoom(labels_ms, sigma0fs.shape[0] / labels_ms.shape[0], order=0)
     plt.imsave(ifilepath.replace('HH_har_norm', 'zones') + '.png', labels_fs)
 

@@ -17,7 +17,7 @@ gaus_size = 0.2 # c.a. 3 pixels
 # load TFs, load presaved logMeanStd, normalize and save
 for pol in ['HH', 'HV']:
     # name of output file to keep normalization
-    normFile = normFilePrefix + pol + '.npy'
+    normFile = os.path.join(idir, normFilePrefix + pol + '.npy')
     # input files with TFs for this pol
     ifiles = sorted(glob.glob(idir + '*%s_har.npz' % pol))
     for ifile in ifiles:
