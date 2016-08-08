@@ -110,6 +110,7 @@ def get_texture_features(iarray, ws, stp, threads):
     # calculate directional mean
     harImageAnis = harImage.mean(axis=2)
 
+    pool.close()
     # reshape matrix and make images to be on the first dimension
     return np.swapaxes(harImageAnis.T, 1, 2)
 
