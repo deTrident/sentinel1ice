@@ -1,8 +1,9 @@
 # sentinel1ice
-Ice/water classification of Sentinel1 SAR data
+## Ice/water classification of Sentinel1 SAR data
 
-* extract_hv_stats.py - for multiple scenes: save statistics of average dependence of sigma0_HV on elevation angle;
-* extract_hh_stats.py - for multiple scenes: save statistics of average dependence of sigma0_HH on elevation angle;
-* save_averaged_noise.py - average statistics of sigma0 dependece on EA from many scenes and save as thermal noise;
-* remove_noise.py - remove thermal noise (and angular dependence) several scenes;
-* test_text_feat_options.py - test influence of TF calculation options on results of cluster analysis;
+ * 01calculate_text_features.py - apply thermal noise correction from [sentinel1denoised](https://github.com/nansencenter/sentinel1denoised) and calculate texture features using [mahotas](https://pypi.python.org/pypi/mahotas)
+ * 02save_norm_coefs.py - find and save (log-)normalization coefficients
+ * 03normalize_tf.py - (log-)normalize texture features
+ * 04run_pca.py - run PCA and K-means classification. Save PCA and ZONES maps
+ * 05train_svm.py - after manual reclassification train SVM
+ * 06apply_svm.py - apply the trained SVM

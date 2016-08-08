@@ -6,49 +6,55 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mahotas
 
-from sentinel1image import Sentinel1Image
+from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
 from sar2ice import convert2gray, get_texture_features
 
 # find input files
-idir = '/files/sentinel1a/'
+idir = '/files/sentinel1a/odata/'
 odir = '/files/sentinel1a/odata/'
-ifiles = sorted(glob.glob(idir + '*.SAFE'))
+ifiles = sorted(glob.glob(idir + '*.SAFE_s0.npz'))
 
 ## set up parameters for Haralick texture features computation
 stp = 32
 ws  = 32
 l   = 64
-sigma0_max = {'HH': 0,   'HV': -14}
-sigma0_min = {'HH': -15, 'HV': -26}
 threads = 6
+
+# if sigma0_max is None, only create histograms
+#sigma0_max = None
+#sigma0_min = None
+sigma0_max = {'HH': -3,  'HV': -17}
+sigma0_min = {'HH': -25, 'HV': -33}
 
 for ifilepath in ifiles:
     ifile = os.path.split(ifilepath)[1]
     print ifile
+    wm = None
     for pol in ['HH', 'HV']:
         # set output file namew
         ofile = '%s_%s_' % (os.path.join(odir, ifile), pol)
-        ofileNPZ = ofile + 'har.npz'
+        ofileHAR = ofile + 'har.npz'
 
         # skip processing already extisting files
-        if os.path.exists(ofileNPZ):
+        if os.path.exists(ofileHAR):
             continue
 
-        # read data from input file
-        s1i = Sentinel1Image(idir + ifile)
-        #s1i.crop(2000, 2000, 1000, 1000)  # for testing only
-        print 'Read sigma0_%s from %s' % (pol, ifile)
-        sigma0 = s1i['sigma0_%s' % pol]
+        # read data from denoised NPZ
+        wm = np.load(ifilepath)['wm']
+        sigma0 = np.load(ifilepath)['sigma0_%s_denoised' % pol]
 
-        # make full res JPG
-        plt.imsave(ofile + 'sigma0.jpg', sigma0, vmin=sigma0_min[pol], vmax=sigma0_max[pol], cmap='gray')
+        # create histograms
+        histfile = ofile + 'hist.png'
+        if not os.path.exists(histfile):
+            plt.hist(sigma0[(wm != 2) * np.isfinite(sigma0)], 100)
+            plt.savefig(histfile, dpi=100)
+            plt.close()
 
         # convert to integer leves
         sigma0 = convert2gray(sigma0, sigma0_min[pol], sigma0_max[pol], l)
 
         # mask land
         print 'mask land'
-        wm = s1i.watermask()[1]
         sigma0[wm == 2] = 0
 
         # get texture features
@@ -62,4 +68,4 @@ for ifilepath in ifiles:
         #     unsupervised classification,
         #     teaching SVM
         #     supervised classification)
-        np.savez_compressed(ofileNPZ, tfs=tfs)
+        np.savez_compressed(ofileHAR, tfs=tfs)

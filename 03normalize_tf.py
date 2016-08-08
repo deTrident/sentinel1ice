@@ -8,15 +8,16 @@ from scipy.ndimage.filters import gaussian_filter
 
 from sar2ice import normalize_texture_features
 
-percentile = .1
 idir = '/files/sentinel1a/odata/'
 normFilePrefix = 'norm01'
+percentile = .1
+gaus_size = 0.2 # c.a. 3 pixels
 
 # apply normalization and clipping
 # load TFs, load presaved logMeanStd, normalize and save
 for pol in ['HH', 'HV']:
     # name of output file to keep normalization
-    normFile = normFilePrefix + pol + '.npy'
+    normFile = os.path.join(idir, normFilePrefix + pol + '.npy')
     # input files with TFs for this pol
     ifiles = sorted(glob.glob(idir + '*%s_har.npz' % pol))
     for ifile in ifiles:
@@ -35,7 +36,7 @@ for pol in ['HH', 'HV']:
             tfsNorm[i, tf > tfMax] = np.nan
 
             # remove 2 NaN neighbours
-            tfGaus = gaussian_filter(tfsNorm[i], 1)
+            tfGaus = gaussian_filter(tfsNorm[i], gaus_size)
             tfsNorm[i, np.isnan(tfGaus)] = np.nan
 
         # save to output file

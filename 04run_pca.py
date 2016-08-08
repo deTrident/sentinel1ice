@@ -3,11 +3,14 @@ import glob
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage.interpolation import zoom
+
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 
 idir = '/files/sentinel1a/odata/'
 n_components=6
+n_clusters=15
 
 ifiles = sorted(glob.glob(idir + '*_HH_har_norm.npz'))
 
@@ -37,7 +40,7 @@ pcaDataGood = PCA(n_components=n_components).fit_transform(joinedTF[:, gpi].T)
 
 # run automatic unsupervised classification using k-means
 print 'run KMeans'
-lablesGood = KMeans(n_clusters=15).fit_predict(pcaDataGood[:, :3])
+lablesGood = KMeans(n_clusters=n_clusters).fit_predict(pcaDataGood[:, :n_components])
 
 # make scatter plots with (1st vs 2nd and 3rd vs 4th) principal components
 # colored by clusters
@@ -77,5 +80,11 @@ for ifilepath in ifiles:
     # vis. spatial distribution of PCAs and labels (map of zones)
     for ipc, pc in enumerate(pcaData):
         plt.imsave(ifilepath.replace('HH_har_norm', 'pc%02d' % ipc) + '.png', pc)
-    plt.imsave(ifilepath.replace('HH_har_norm', 'zones') + '.png', labels)
+
+    # save full-size zones (zoom WS-times)
+    labels_ms = np.zeros((labels.shape[0] + 1, labels.shape[1] + 1)) + np.nan
+    labels_ms[:labels.shape[0], :labels.shape[1]] = labels
+    sigma0fs = plt.imread(ifilepath.replace('_har_norm.npz', '.jpg'))
+    labels_fs = zoom(labels_ms, sigma0fs.shape[0] / labels_ms.shape[0], order=0)
+    plt.imsave(ifilepath.replace('HH_har_norm', 'zones') + '.png', labels_fs)
 

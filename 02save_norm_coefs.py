@@ -22,7 +22,7 @@ normFilePrefix = 'norm01'
 #   STD - scale
 for pol in ['HH', 'HV']:
     # name of output file to keep normalization
-    normFile = normFilePrefix + pol + '.npy'
+    normFile = os.path.join(idir, normFilePrefix + pol + '.npy')
     # input files with TFs for this pol
     ifiles = sorted(glob.glob(idir + '*%s_har.npz' % pol))
     # read TFs from many input images and keep in joinedTF
@@ -42,7 +42,7 @@ for pol in ['HH', 'HV']:
     tfOffsets = []
     for i, tf in enumerate(joinedTF):
         # transform to log if skewed
-        tfMedian = st.nanmedian(tf)
+        tfMedian = np.nanmedian(tf)
         tfMean = np.nanmean(tf)
         tfMin = np.nanmin(tf)
         tfMax = np.nanmax(tf)
