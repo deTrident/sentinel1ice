@@ -149,11 +149,18 @@ def convert2gray(iarray, vmin, vmax, l):
         oarray : ndarray
             2D matrix with values of gray levels in UINT8 format
     '''
+    
+    # raise error if l is greater than 255.
+    if l > 255:
+        raise ValueError('maximum gray level cannot be greater than 255.')
+    
     # convert to integer levels
+    nanIdx = np.isnan(iarray)
     iarray = 1 + (l - 1) * (iarray - vmin) / (vmax - vmin)
-    iarray = np.nan_to_num(iarray)   # nan -> 0.  Pixels with 0 will be ignored in GLCM
+    iarray[nanIdx] = 0
     iarray[iarray < 1] = 1
     iarray[iarray > l] = l
+    iarray[nanIdx] = 0      # NaN -> 0.
 
     # return as unsigned integer
     return iarray.astype('uint8')
