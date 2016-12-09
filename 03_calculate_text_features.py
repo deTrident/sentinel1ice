@@ -9,13 +9,7 @@ idir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_corrected/'
 odir = ( os.path.abspath(os.getcwd()+'/../shared/test_data/sentinel1a_l1')
          +'/odata_FramStrait_TFs/' )
 ifiles = sorted(glob.glob(idir + 'S1A_EW_GRDM_1SDH*_s0.npz'))
-'''
-# select data cover specific season
-dateMin , dateMax = '20151220' , '20160320'    # winter
-#dateMin , dateMax = '20160620' , '20160910'    # summer
-ifiles = [ ifile for ifile in ifiles
-          if dateMin <= os.path.split(ifile)[1][17:25] <= dateMax ]
-'''
+
 # dynamic range of sigma0
 # run 'Extras_getDynamicRange.py' to get optimal values
 sigma0_max = {'HH':   0.0, 'HV': -12.0}
