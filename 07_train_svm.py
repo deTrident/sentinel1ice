@@ -1,18 +1,12 @@
-import os
-import glob
-import pickle
-
+import os, glob, pickle
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.stats as st
-import numpy as np
-
 from PIL import Image
-
 from sklearn import svm
 from sar2ice import apply_svm
 
-idir = '/files/sentinel1a/odata/'
+idir = ( os.path.abspath(os.getcwd()+'/../shared/test_data/sentinel1a_l1')
+         +'/odata_FramStrait_TFs/' )
 myZonesSuffix = '_my_zones.png'
 zoneColors = [0, 255]
 n_threads = 6
@@ -21,7 +15,7 @@ svmFile = 'svm.pickle'
 ifilesHH = sorted(glob.glob(idir + '*_HH_har_norm.npz'))
 allData = []
 for ifileHH in ifilesHH:
-    ifileHV = ifileHH.replace('HH', 'HV')
+    ifileHV = ifileHH.replace('HH','HV')
     ifileMyZones = ifileHH.replace('_HH_har_norm.npz', myZonesSuffix)
     if not os.path.exists(ifileHV):
         continue
