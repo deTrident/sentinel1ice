@@ -13,6 +13,12 @@ idir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_denoised/'
 odir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_corrected/'
 ifiles = sorted(glob.glob(idir + 'S1A_EW_GRDM_1SDH*_s0.npz'),reverse=False)
 
+# select data cover specific season
+dateMin , dateMax = '20151220' , '20160320'    # winter
+#dateMin , dateMax = '20160620' , '20160910'    # summer
+ifiles = [ ifile for ifile in ifiles
+          if dateMin <= os.path.split(ifile)[1][17:25] <= dateMax ]
+
 # set up parameters for Haralick texture features computation later
 # stp and ws must be same to them in '03_calculate_text_features.py'
 ws  = 25    # 1km pixel spacing (40m * 25 = 1000m)
@@ -20,13 +26,13 @@ ws  = 25    # 1km pixel spacing (40m * 25 = 1000m)
 for ifile in ifiles:
     
     ifilename = os.path.split(ifile)[1]
-    print('Run denoising of sigma0 in: %s' % ifilename)
     pol = ifilename[68:70]
     ofile = os.path.join(odir, ifilename)
     if os.path.exists(ofile):
         continue
 
     # run denoising and save results.
+    print('Run denoising of sigma0 in: %s' % ifilename)
     S1_EW_GRD_StatCorrection(ifile,ofile,pol,ws)
 
     # create quickview
