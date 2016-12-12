@@ -1,6 +1,9 @@
+''' Use built-in backend AGG to prevent X server error.
+    This error happens when work in remote server through ssh '''
+import matplotlib;    matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
-import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from sar2ice import convert2gray, get_texture_features, bufferMask
 

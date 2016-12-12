@@ -1,8 +1,11 @@
+''' Use built-in backend AGG to prevent X server error.
+    This error happens when work in remote server through ssh '''
+import matplotlib;    matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
-
-from sar2ice import normalize_texture_features, normalize_texture_features
+from sar2ice import normalize_texture_features
 
 idir = ( os.path.abspath(os.getcwd()+'/../shared/test_data/sentinel1a_l1')
         + '/odata_FramStrait_TFs/' )
