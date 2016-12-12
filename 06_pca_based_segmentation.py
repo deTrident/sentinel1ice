@@ -4,7 +4,6 @@ import matplotlib;    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
-from scipy.ndimage.interpolation import zoom
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 
@@ -87,5 +86,6 @@ for ifile in ifiles:
     labels_ms = np.zeros((labels.shape[0]+1, labels.shape[1]+1)) + np.nan
     labels_ms[:labels.shape[0], :labels.shape[1]] = labels
     fs_dim = np.load(ifile)['proc_params'].item()['input_dimension']
-    labels_fs = zoom(labels_ms, fs_dim[0] / labels_ms.shape[0], order=0)
+    ws = np.load(ifile)['proc_params'].item()['window_size']
+    labels_fs = convert2fullres(labels_ms,fs_dim,ws)
     plt.imsave(ifile.replace('HH_har_norm', 'zones') + '.png', labels_fs)

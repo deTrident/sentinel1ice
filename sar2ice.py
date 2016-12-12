@@ -516,14 +516,30 @@ def get_map(s1i, bands, vmin, vmax,
 
 
 def createKernel(radius):
+    
     kernel = np.zeros((2*radius+1, 2*radius+1))
     y,x = np.ogrid[-radius:radius+1, -radius:radius+1]
     mask = x**2 + y**2 <= radius**2
     kernel[mask] = 1
+    
     return kernel
 
 
 def bufferMask(inputMask,bufferSize):
+    
     return morphology.binary_dilation(inputMask,structure=createKernel(bufferSize))
 
+
+def convert2fullres(inArray,outDim,comp_fac):
+    
+    inArray = np.array(inArray)
+    inDim = inArray.shape
+    outArray = np.ones(outDim) * np.nan
+    outArray_chunks = [ x * np.ones((comp_fac,comp_fac))
+                        for x in inArray.flatten() ]
+    outArray[:inDim[0]*comp_fac,:inDim[1]*comp_fac] = np.concatenate(
+        np.array_split( np.concatenate(outArray_chunks, axis=1),
+                        inDim[0], axis=1), axis=0 )
+
+    return outArray
 
