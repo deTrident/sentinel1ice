@@ -37,9 +37,7 @@ for pol in ['HH', 'HV']:
             tfMin, tfMax = np.percentile(
                 tf[np.isfinite(tf)], (percentile, 100-percentile) )
             # clip outliers
-            tf[np.isnan(tf)] = tfMin-np.finfo(tf.dtype).eps
             tfsNorm[i, tf < tfMin] = np.nan
-            tf[np.isnan(tf)] = tfMax-np.finfo(tf.dtype).eps
             tfsNorm[i, tf > tfMax] = np.nan
             # remove 2 NaN neighbours
             tfGaus = gaussian_filter(tfsNorm[i], gaus_size)
