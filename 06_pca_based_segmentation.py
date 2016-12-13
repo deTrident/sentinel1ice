@@ -6,6 +6,7 @@ import os, glob
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+from sar2ice import convert2fullres
 
 idir = ( os.path.abspath(os.getcwd()+'/../shared/test_data/sentinel1a_l1')
          +'/odata_FramStrait_TFs/' )
