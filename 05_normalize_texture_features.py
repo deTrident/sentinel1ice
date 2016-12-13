@@ -12,7 +12,7 @@ idir = ( os.path.abspath(os.getcwd()+'/../shared/test_data/sentinel1a_l1')
 normFilePrefix = 'norm01'
 trans_thres = 0.
 trans_alg = 'boxcox'
-percentile = .1
+percentile = 0     # caution: clipping results in more void cells.
 gaus_size = 0.2 # c.a. 3 pixels
 
 # apply normalization and clipping
