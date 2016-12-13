@@ -64,10 +64,9 @@ for ifile in ifiles:
         # create quickview
         print 'Make full resolution JPG'
         jpgfile = ofile[pol][:-4] + '.jpg'
-        vmin = np.percentile( results['sigma0'][ np.isfinite(results['sigma0'])
-                                                 * (results['wm']!=2) ], 1. )
-        vmax = np.percentile( results['sigma0'][ np.isfinite(results['sigma0'])
-                                                 * (results['wm']!=2) ], 99. )
+        vmin, vmax = np.percentile(
+                         results['sigma0'][ np.isfinite(results['sigma0'])
+                                            * (results['wm']!=2) ], (1.,99.) )
         s1i.write_figure( jpgfile, 'sigma0_%s_denoised' % pol,
                           clim=[vmin, vmax], cmapName='gray')
         #s1i.write_figure( jpgfile[:-4]+'.jpeg', 'sigma0_%s_raw' % pol,

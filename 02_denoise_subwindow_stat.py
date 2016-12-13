@@ -34,6 +34,5 @@ for ifile in ifiles:
     jpgfile = ofile[:-4] + '.jpg'
     sigma0 = np.load(ofile)['sigma0']
     wm = np.load(ofile)['wm']
-    vmin = np.percentile( sigma0[np.isfinite(sigma0)*(wm!=2)], 1. )
-    vmax = np.percentile( sigma0[np.isfinite(sigma0)*(wm!=2)], 99. )
+    vmin, vmax = np.percentile( sigma0[np.isfinite(sigma0)*(wm!=2)], (1.,99.) )
     Image.fromarray(convert2gray(sigma0,vmin,vmax,255)).convert('RGB').save(jpgfile)

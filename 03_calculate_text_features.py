@@ -51,8 +51,7 @@ for ifile in ifiles:
     
     # save each texture feature in a PNG
     for i, tf in enumerate(tfs):
-        vmin = np.percentile( tf[np.isfinite(tf)], 2.5 )
-        vmax = np.percentile( tf[np.isfinite(tf)], 97.5 )
+        vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
         plt.imsave( ofile.replace('har.npz','har%02d.png' % i),
                     tf, vmin=vmin, vmax=vmax )
 
