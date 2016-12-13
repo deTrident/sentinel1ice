@@ -537,9 +537,9 @@ def convert2fullres(inArray,outDim,comp_fac):
     outArray = np.ones(outDim) * np.nan
     outArray_chunks = [ x * np.ones((comp_fac,comp_fac))
                         for x in inArray.flatten() ]
-    outArray[:inDim[0]*comp_fac,:inDim[1]*comp_fac] = np.concatenate(
-        np.array_split( np.concatenate(outArray_chunks, axis=1),
-                        inDim[0], axis=1), axis=0 )
+    outArray = ( np.concatenate( np.array_split( np.concatenate( outArray_chunks,
+                     axis=1 ), inDim[0], axis=1 ), axis=0 )
+                 [:inDim[0]*comp_fac,:inDim[1]*comp_fac] )
 
     return outArray
 

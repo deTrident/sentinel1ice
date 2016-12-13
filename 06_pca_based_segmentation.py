@@ -81,7 +81,9 @@ for ifile in ifiles:
 
     # vis. spatial distribution of PCAs and labels (map of zones)
     for ipc, pc in enumerate(pcaData):
-        plt.imsave(ifile.replace('HH_har_norm', 'pc%02d' % ipc) + '.png', pc)
+        vmin, vmax = np.percentile( pc[np.isfinite(pc)], (2.5, 97.5) )
+        plt.imsave( ifile.replace('HH_har_norm', 'pc%02d' % ipc) + '.png',
+                    pc, vmin=vmin, vmax=vmax )
 
     # save full-size zones (zoom WS-times)
     labels_ms = np.zeros((labels.shape[0]+1, labels.shape[1]+1)) + np.nan
