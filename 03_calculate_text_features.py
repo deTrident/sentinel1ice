@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
 from multiprocessing import Pool
-from sar2ice import convert2gray, get_texture_features
-from scipy.ndimage import maximum_filter
+from sar2ice import convert2gray, get_texture_features, bufferMask
 
 # find input files
 idir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_corrected/'
@@ -20,8 +19,8 @@ sigma0_max = {'HH':   0.0, 'HV': -12.0}
 sigma0_min = {'HH': -24.5, 'HV': -30.0}
 
 # set up parameters for Haralick texture features computation
-stp = 25    # step size
-ws  = 25    # 1km pixel spacing (40m * 25 = 1000m)
+stp = 25    # 1km pixel spacing (40m * 25 = 1000m)
+ws  = 25    # step size
 l   = 64    # gray-level. 32 or 64.
 threads = 4
 alg = 3
@@ -44,19 +43,18 @@ for ifile in ifiles:
     wm = np.load(ifile)['wm']
     sigma0 = np.load(ifile)['sigma0']
     sigma0 = convert2gray(sigma0, sigma0_min[pol], sigma0_max[pol], l)
-    # apply land mask with buffer size of (ws*2).
-    sigma0[maximum_filter(wm==2,ws*2)] = 0
+    sigma0[bufferMask(wm==2,3)] = 0   # apply land mask with buffer (3 px)
 
     # get texture features
     print 'compute texture features'
     tfs = get_texture_features(sigma0, ws, stp, threads, alg)
-    '''
+    
     # save each texture feature in a PNG
     for i, tf in enumerate(tfs):
         vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
         plt.imsave( ofile.replace('har.npz','har%02d.png' % i),
                     tf, vmin=vmin, vmax=vmax )
-    '''
+
     # save texture features for further processing
     proc_params = { 'input_dimension':sigma0.shape, 'window_size':ws,
                     'step_size':stp, 'gray_level':l, 'glcm_algorithm':alg }
