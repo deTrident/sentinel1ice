@@ -37,18 +37,21 @@ for pol in ['HH', 'HV']:
             tfMin, tfMax = np.percentile(
                 tf[np.isfinite(tf)], (percentile, 100-percentile) )
             # clip outliers
-            tfsNorm[i, tf < tfMin] = np.nan
-            tfsNorm[i, tf > tfMax] = np.nan
+            #tfsNorm[i, tf < tfMin] = np.nan
+            #tfsNorm[i, tf > tfMax] = np.nan
+            # replace outliers with max/min. clipping results in void cells.
+            tfsNorm[i, tf < tfMin] = tfMin
+            tfsNorm[i, tf > tfMax] = tfMax
             # remove 2 NaN neighbours
             tfGaus = gaussian_filter(tfsNorm[i], gaus_size)
             tfsNorm[i, np.isnan(tfGaus)] = np.nan
-
+        
         # save each normalized texture feature in a PNG
         for i, tf in enumerate(tfsNorm):
             vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
             plt.imsave( ifile.replace('har.npz','har%02d_norm.png' % i),
                         tf, vmin=vmin, vmax=vmax )
-
+        
         # save normalized texture features to output file
         proc_params = np.load(ifile)['proc_params']
         np.savez_compressed( ifile.replace('_har.npz','_har_norm.npz'),
