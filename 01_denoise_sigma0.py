@@ -46,7 +46,17 @@ for ifile in ifiles:
 
         # generate watermask
         if 'wm' not in results:
-            results['wm'] = s1i.watermask()[1]
+            skipRow, skipCol = 4,4          # choose from [1,2,4,5]
+            nGCPs = s1i.vrt.dataset.GetGCPCount()
+            GCPs = s1i.vrt.dataset.GetGCPs()
+            idx = np.arange(0,nGCPs).reshape(nGCPs//21,21)
+            skipRow = max( [ y for y in range(1,nGCPs//21)
+                             if ((nGCPs//21 -1) % y == 0) and y <= skipRow ] )
+            smpGCPs = [ GCPs[i] for i in np.concatenate(idx[::skipRow,::skipCol]) ]
+            GCPProj = s1i.vrt.dataset.GetGCPProjection()
+            dummy = s1i.vrt.dataset.SetGCPs(smpGCPs,GCPProj)
+            results['wm'] = s1i.watermask(tps=True)[1]
+            dummy = s1i.vrt.dataset.SetGCPs(GCPs,GCPProj)
 
         # compute histograms
         bin_edges = np.arange(-40,+10.5,0.5)
