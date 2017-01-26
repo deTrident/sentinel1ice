@@ -6,6 +6,8 @@ import os, glob, zipfile, shutil
 import numpy as np
 from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
 
+# fake changes to illustarte how git works
+
 # find input files
 idir = '/Volumes/ExFAT2TB/Sentinel1A/FramStrait/'
 odir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_denoised/'
