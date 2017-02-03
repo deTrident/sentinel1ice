@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 idir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_denoised/'
 
-edge_percent = 0.1  # threshold for clipping extreme values
+edge_percent = 0.5  # threshold for clipping extreme values
 
 for pol in ['HH','HV']:
 
@@ -23,7 +23,7 @@ for pol in ['HH','HV']:
     sigma0_max = hist_bin_edges[np.where(hist_cum > (100-edge_percent)/100 * hist_sum)[0][0]]
     print( '%s sigma0 range (%3.1f-%3.1f%%): %.2f dB to %.2f dB'
            % (pol,edge_percent,100-edge_percent,sigma0_min,sigma0_max))
-    plt.plot( hist_bin_edges[:-1]+np.diff(hist_bin_edges), np.sum(hist_stack,axis=0), label='%s' %pol )
+    plt.plot( hist_bin_edges[:-1]+np.diff(hist_bin_edges)/2, np.sum(hist_stack,axis=0), label='%s' %pol )
 
 plt.xlabel('sigma0'), plt.ylabel('frequency')
 plt.title('sigma0 distributions extracted from %d images' % len(ifiles))

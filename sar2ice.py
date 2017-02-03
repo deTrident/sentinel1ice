@@ -537,10 +537,84 @@ def convert2fullres(inArray,outDim,comp_fac):
     outArray = np.ones(outDim) * np.nan
     outArray_chunks = [ x * np.ones((comp_fac,comp_fac))
                         for x in inArray.flatten() ]
-    outArray[:inDim[0]*comp_fac,:inDim[1]*comp_fac] = (
-        np.concatenate( np.array_split( np.concatenate( outArray_chunks, axis=1 ),
-                                        inDim[0], axis=1 ), axis=0 )
-        [:inDim[0]*comp_fac,:inDim[1]*comp_fac] )
+    outArray = ( np.concatenate( np.array_split( np.concatenate(
+                     outArray_chunks, axis=1 ),inDim[0], axis=1 ), axis=0 )
+                 [:outDim[0],:outDim[1]] )
 
     return outArray
+
+
+def fixedPatchProc(inputDataArray,inputSWindexArray,function,windowSize):
+    
+    function = eval(function)
+    nRowsOrig, nColsOrig = inputDataArray.shape
+    nRowsProc = (nRowsOrig//windowSize+bool(nRowsOrig%windowSize))*windowSize
+    nColsProc = (nColsOrig//windowSize+bool(nColsOrig%windowSize))*windowSize
+    dataChunks = np.ones((nRowsProc,nColsProc))*np.nan
+    dataChunks[:nRowsOrig,:nColsOrig] = inputDataArray.copy()
+    SWindexChunks = np.ones((nRowsProc,nColsProc))*np.nan
+    SWindexChunks[:nRowsOrig,:nColsOrig] = inputSWindexArray.copy()
+    del inputDataArray, inputSWindexArray
+
+    dataChunks = [ dataChunks[i*windowSize:(i+1)*windowSize,
+                              j*windowSize:(j+1)*windowSize]
+                   for (i,j) in np.ndindex(nRowsProc//windowSize,
+                                           nColsProc//windowSize) ]
+    SWindexChunks = [ SWindexChunks[i*windowSize:(i+1)*windowSize,
+                                    j*windowSize:(j+1)*windowSize]
+                      for (i,j) in np.ndindex(nRowsProc//windowSize,
+                                              nColsProc//windowSize) ]
+
+    def subfunc_fixedPatchProc(inputDataChunk,inputSWindexChunk):
+        outputDataChunk = np.ones_like(inputDataChunk)*np.nan
+        uniqueIndices = np.unique(inputSWindexChunk)
+        uniqueIndices = uniqueIndices[uniqueIndices>0]  # ignore 0
+        for uniqueIndex in uniqueIndices:
+            mask = (inputSWindexChunk==uniqueIndex)*np.isfinite(inputDataChunk)
+            outputDataChunk[mask] = function(inputDataChunk[mask])
+        return np.nanmean(outputDataChunk)
+
+    outputDataArray = map( subfunc_fixedPatchProc, dataChunks, SWindexChunks )
+    del dataChunks,SWindexChunks
+    outputDataArray = (
+        np.reshape(outputDataArray,[nRowsProc//windowSize,nColsProc//windowSize])
+        )[:nRowsOrig//windowSize,:nColsOrig//windowSize]
+
+    return outputDataArray
+
+
+def slidingPatchProc(inputDataArray,inputSWindexArray,function,windowSize):
+    
+    if windowSize%2 != 1:
+        raise ValueError('windowSize must be odd number.')
+    hWin = int(windowSize)/2
+    function = eval(function)
+    nRowsOrig, nColsOrig = inputDataArray.shape
+    nRowsProc = nRowsOrig+2*hWin
+    nColsProc = nColsOrig+2*hWin
+    dataArray = np.ones((nRowsProc,nColsProc))*np.nan
+    dataArray[hWin:-hWin,hWin:-hWin] = inputDataArray.copy()
+    SWindexArray = np.ones((nRowsProc,nColsProc))*np.nan
+    SWindexArray[hWin:-hWin,hWin:-hWin] = inputSWindexArray.copy()
+    outputDataArray = np.ones((nRowsProc,nColsProc))*np.nan
+    del inputDataArray, inputSWindexArray
+    
+    def subfunc_movingPatchProc(inputDataChunk,inputSWindexChunk):
+        outputData = np.ones_like(inputDataChunk)*np.nan
+        uniqueIndices = np.unique(inputSWindexChunk)
+        uniqueIndices = uniqueIndices[uniqueIndices>0]  # ignore 0
+        for uniqueIndex in uniqueIndices:
+            mask = (inputSWindexChunk==uniqueIndex)*np.isfinite(inputDataChunk)
+            outputData[mask] = function(inputDataChunk[mask])
+        return np.nanmean(outputData)
+
+    for ir in range(hWin,nRowsProc-hWin):
+        dataChunks = [ dataArray[ir-hWin:ir+hWin+1,ic-hWin:ic+hWin+1]
+                       for ic in range(hWin,nColsProc-hWin) ]
+        SWindexChunks = [ SWindexArray[ir-hWin:ir+hWin+1,ic-hWin:ic+hWin+1]
+                          for ic in range(hWin,nColsProc-hWin) ]
+        outputDataArray[ir,hWin:-hWin] = map(
+            subfunc_movingPatchProc, dataChunks,SWindexChunks )
+
+    return outputDataArray[hWin:-hWin,hWin:-hWin]
 
