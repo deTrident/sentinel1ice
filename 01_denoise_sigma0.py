@@ -1,3 +1,7 @@
+''' Use built-in backend AGG to prevent X server error.
+    This error happens when work in remote server through ssh '''
+import matplotlib;    matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import os, glob, zipfile, shutil
 import numpy as np
 from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
@@ -71,10 +75,10 @@ for ifile in ifiles:
         vmin, vmax = np.percentile(
             results['sigma0'][ np.isfinite(results['sigma0'])
                                * (results['wm']!=2) ], (1.,99.) )
-        s1i.write_figure( ofile[pol][:-4] + '_original.jpg', 'sigma0_%s_raw' % pol,
-                          clim=[vmin, vmax], cmapName='gray' )
-        s1i.write_figure( ofile[pol][:-4] + '_denoised.jpg', 'sigma0_%s_denoised' % pol,
-                          clim=[vmin, vmax], cmapName='gray')
+        plt.imsave( ofile[pol].replace('.npz','_original.jpg'), sigma0raw,
+                    vmin=vmin, vmax=vmax, cmap='gray')
+        plt.imsave( ofile[pol].replace('.npz','_denoised.jpg'), results['sigma0'],
+                    vmin=vmin, vmax=vmax, cmap='gray')
 
         # save denoised data
         np.savez_compressed(ofile[pol] , **results)
