@@ -10,7 +10,7 @@ from sar2ice import convert2fullres
 
 idir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_TFs/'
 nPC = 6     # number of PC
-nPC4cluster = 6     # number of PC to use for clustering
+nPC4cluster = [0,1,2,3,4,5]     # index of PC to use for clustering
 nCluster = 15       # number of cluster
 tfsID = range(13)
 
@@ -21,7 +21,7 @@ joinedTF = []
 for ifile in ifiles:
     print ifile
     hhhvTF = []
-    for pol in ['HH', 'HV']:
+    for pol in ['HH','HV']:
         # load normalized TF from HH or HV as 3D cubes (13 x rows x cols)
         harData = np.load(ifile.replace('_HH_', '_%s_' % pol))['tfsNorm'][tfsID,:,:]
         # join TFs into single 2D matrix (26 x rows*cols)
@@ -36,11 +36,11 @@ gpi = np.isfinite(joinedTF.sum(axis=0))
 
 # run PCA to reduce dimensionality and keep information
 print 'run PCA'
-pcaDataGood = PCA(n_components=nPC).fit_transform(joinedTF[:, gpi].T)
+pcaDataGood = PCA(n_components=nPC).fit_transform(joinedTF[:,gpi].T)
 
 # run automatic unsupervised classification using k-means
 print 'run KMeans'
-lablesGood = KMeans(n_clusters=nCluster).fit_predict(pcaDataGood[:, :nPC4cluster])
+lablesGood = KMeans(n_clusters=nCluster).fit_predict(pcaDataGood[:,nPC4cluster])
 
 # make scatter plots with (1st vs 2nd and 2nd vs 3rd) principal components
 # colored by clusters
@@ -52,7 +52,7 @@ for i in range(nPC-1):
 
 # paste good PC and labels data into full size matrix
 pcaDataAll = np.zeros((nPC, joinedTF.shape[1])) + np.nan
-pcaDataAll[:, gpi] = pcaDataGood.T
+pcaDataAll[:,gpi] = pcaDataGood.T
 labelsAll = np.zeros(joinedTF.shape[1]) + np.nan
 labelsAll[gpi] = lablesGood
 
