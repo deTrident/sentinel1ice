@@ -242,8 +242,6 @@ def compute_transform_coeffs(tf, **kwargs):
         ----------
         tf : ndarray
             1D vector of texture feature
-        percentile : float, optional
-            percentile to use for cliping extreme values. Default is 0.1.
         algorithm : str, optional
             transform type. Default is 'log'.
             'log'
@@ -251,51 +249,39 @@ def compute_transform_coeffs(tf, **kwargs):
                 apply exponential transform for negatively skewed data.
             'boxcox'
                 apply Box-Cox transform and optimized lambda value
-        skew_thres : float, optional
-            skewness threshold for determining the application of transform.
-            Data having skewness lower than this threshold will not be transformed.
-            Default is 2.
         
         Returns
         -------
         newTF : ndarray
-        3D matrix with normalized texture features (same size, dtype)
+            1D vector of normalized texture feature (same size, dtype)
+        normCoeffs : ndarray
+            1D vector of five normalization coefficients
     '''
 
     for key in kwargs:
-        if key not in [ 'percentile', 'algorithm' , 'skew_thres' ]:
+        if key not in [ 'algorithm' , 'ignore_value' ]:
             raise KeyError("compute_transform_coeffs() got an unexpected keyword argument '%s'" % key)
 
-    if 'percentile' not in kwargs:
-        kwargs['percentile'] = 0.1
-
     if 'algorithm' not in kwargs:
-        kwargs['algorithm'] = 'log'
+        kwargs['algorithm'] = 'boxcox'
     elif kwargs['algorithm'] not in [ 'log' , 'boxcox' ]:
         raise KeyError("kwargs['algorithm'] got an invalid value '%s'"
                        % kwargs['algorithm'])
-
-    if 'skew_thres' not in kwargs:
-        kwargs['skew_thres'] = 2.
-
-    percentile = np.abs(np.float(kwargs['percentile']))
     algorithm = kwargs['algorithm']
-    skew_thres = np.abs(np.float(kwargs['skew_thres']))
 
-    tfMin = np.nanmin(tf)
-    tfMax = np.nanmax(tf)
-    tfMean = np.nanmean(tf)
-    tfSkew = skew(tf[np.isfinite(tf)])
-    finiteIdx = np.isfinite(tf)
+    tf = tf[np.isfinite(tf)]
+    tfMin,tfMax = np.min(tf), np.max(tf)
+    tfSkew = skew(tf)
+    tfMean = np.mean(tf)
 
     if algorithm=='log':
         transPar2 = 0
         
-        if tfSkew > skew_thres:
+        if tfSkew > 0:
             print 'log-trans',
             transPar1 = - tfMin + 0.1 * np.abs(tfMean)
             newTF = np.log10(tf + transPar1)
-        elif tfSkew < -skew_thres:
+        elif tfSkew < 0:
             print 'exp-trans',
             transPar1 = - tfMax
             newTF = 10 ** (tf + transPar1)
@@ -306,25 +292,15 @@ def compute_transform_coeffs(tf, **kwargs):
 
     elif algorithm=='boxcox':
     
-        if abs(tfSkew) > skew_thres:
-            print ' Box-Cox ',
-            transPar1 = 1 - tfMin
-            transTF, transPar2 = boxcox(tf[finiteIdx] + transPar1)
-            newTF = np.ones_like(tf) * np.nan
-            newTF[finiteIdx] = transTF
-        else:
-            print ' no trans',
-            newTF = np.array(tf)
-            transPar1 = 0
-            transPar2 = 0
+        print ' Box-Cox ',
+        transPar1 = 1 - tfMin
+        newTF, transPar2 = boxcox(tf + transPar1)
 
-    newTFStd = np.nanstd(newTF)
-    newTFMean = np.nanmean(newTF)
+    newTFStd = np.std(newTF)
+    newTFMean = np.mean(newTF)
     newTF = (newTF - newTFMean) / newTFStd
-    newTFMin, newTFMax = np.percentile(newTF[finiteIdx], (percentile, 100-percentile))
-    newTFSkew = skew(newTF[finiteIdx])
 
-    return newTF, [tfSkew, transPar1, transPar2, newTFMean, newTFStd], newTFSkew
+    return newTF, [tfSkew, transPar1, transPar2, newTFMean, newTFStd]
 
 
 def normalize_texture_features(tfs, normFile, **kwargs):
@@ -374,30 +350,30 @@ def normalize_texture_features(tfs, normFile, **kwargs):
 
 
     # load log-flag, mean and STD
-    normCoefs = np.load(normFile)
+    normCoeffs = np.load(normFile)
     # make copy of tfs
     tfsNorm = np.array(tfs)
 
     print('---> TRANSFORM CODE = '),
     # log-transform or exp-transform if needed some of the TFs
-    for i, tfSkew in enumerate(normCoefs[0]):
+    for i, tfSkew in enumerate(normCoeffs[:,0]):
         if abs(tfSkew) < skew_thres:
             print('N'),
             continue
         elif algorithm=='log':
             if tfSkew > skew_thres:
                 print('L'),
-                tfsNorm[i] = np.log10(tfsNorm[i] + normCoefs[1,i]) + normCoefs[2,i]
+                tfsNorm[i] = np.log10(tfsNorm[i] + normCoeffs[i,1]) + normCoeffs[i,2]
             elif tfSkew < -skew_thres:
                 print('E'),
-                tfsNorm[i] = 10 ** (tfsNorm[i] + normCoefs[1,i]) + normCoefs[2,i]
+                tfsNorm[i] = 10 ** (tfsNorm[i] + normCoeffs[i,1]) + normCoeffs[i,2]
         elif algorithm=='boxcox':
             print('B'),
-            tfsNorm[i] = boxcox(tfsNorm[i] + normCoefs[1,i], lmbda=normCoefs[2,i])
+            tfsNorm[i] = boxcox(tfsNorm[i] + normCoeffs[i,1], lmbda=normCoeffs[i,2])
     print('')
 
     # center at mean and normalize to STD
-    tfsNorm = (tfsNorm - normCoefs[3][None][None].T) / normCoefs[4][None][None].T
+    tfsNorm = (tfsNorm - normCoeffs[:,3][None][None].T) / normCoeffs[:,4][None][None].T
     
     return tfsNorm
 
