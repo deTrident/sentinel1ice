@@ -43,7 +43,7 @@ for ifile in ifiles:
         multiLookFactor = 1
         skipGCPs = 4          # choose from [1,2,4,5]
         if multiLookFactor!=1:
-            skipGCPs = ceil(skipGCPs/float(multiLookFactor))
+            skipGCPs = np.ceil(skipGCPs/float(multiLookFactor))
             s1i.resize(factor=1./multiLookFactor)
 
         results['sigma0'] = 10*np.log10(s1i['sigma0_%s_denoised' % pol])
