@@ -553,8 +553,7 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
             with size = input_image.shape() / stp
         '''
 
-    print 'denoising and multi-look ... '
-    sys.stdout.flush()
+    sys.stdout.write('denoising and multi-look ... ')
     start_time = time.time()
     for pol in ['HH','HV']:
         s1i.add_denoised_band( 'sigma0_%s' % pol, denoAlg='NERSC', addPow='EW0',
@@ -564,9 +563,9 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
         skipGCPs = np.ceil(skipGCPs/float(mLook))
         s1i.resize(factor=1./mLook)
     end_time = time.time()
-    print '%s seconds' % (end_time-start_time)
+    sys.stdout.write('%s seconds\n' % (end_time-start_time))
 
-    print 'watermask generation ... '
+    sys.stdout.write('watermask generation ... ')
     sys.stdout.flush()
     start_time = time.time()
     nGCPs = s1i.vrt.dataset.GetGCPCount()
@@ -580,9 +579,9 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
     watermask = s1i.watermask(tps=True)[1]
     dummy = s1i.vrt.dataset.SetGCPs(GCPs,GCPProj)
     end_time = time.time()
-    print '%s seconds' % (end_time-start_time)
+    sys.stdout.write('%s seconds\n' % (end_time-start_time))
 
-    print 'texture feature computation and normalization ... '
+    sys.stdout.write('texture feature computation and normalization ... ')
     sys.stdout.flush()
     start_time = time.time()
     sigma0 = {'HH':[],'HV':[]}
@@ -596,14 +595,14 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
         tfs.append(tf)
     tfs = np.vstack(tfs)
     end_time = time.time()
-    print '%s seconds' % (end_time-start_time)
+    sys.stdout.write('%s seconds\n' % (end_time-start_time))
 
-    print 'apply SVM ... '
+    sys.stdout.write('apply SVM ... ')
     sys.stdout.flush()
     start_time = time.time()
     labels = apply_svm(tfs, svmFile, threads)
     end_time = time.time()
-    print '%s seconds' % (end_time-start_time)
+    sys.stdout.write('%s seconds\n' % (end_time-start_time))
 
     return sigma0,labels
 
