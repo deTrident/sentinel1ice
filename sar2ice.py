@@ -1,13 +1,61 @@
-import os, sys, glob, mahotas, pickle
+import os, sys, glob, mahotas, pickle, time
 import numpy as np
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from sklearn import svm
 from skimage.feature import greycomatrix
-from scipy.ndimage import morphology
+from scipy.ndimage import morphology, maximum_filter
 from scipy.stats import skew, boxcox
 from operator import add
 clf = None
+
+
+def haralick_averagedGLCM(subimage):
+
+    # FOR COMPUTING GLCM,
+    # USE SCIKIT-IMAGE PACKAGE WHICH CAN HANDLE MULTIPLE CO-OCCURANCE DISTANCE.
+    # FOR AVERAGNIG TEXTURE FEATURES FROM MULTIPLE DISTANCES, TAKE MEAN AT GLCM LEVEL
+    cooccuranceDistances = range(1,np.min(subimage.shape)//2)
+    directions = [0, np.pi/4, np.pi/2, 3*np.pi/4]
+    glcmDim = int(np.max(subimage)+1)
+    glcm = greycomatrix( subimage, distances=cooccuranceDistances, \
+                        angles=directions, levels=glcmDim, \
+                        symmetric=True, normed=True )
+    glcm = np.swapaxes(np.nanmean(glcm,axis=2).T,1,2)
+    try:
+        haralick = \
+            mahotas.features.texture.haralick_features( glcm,ignore_zeros=True )
+    except ValueError:
+        haralick = np.zeros((4, 13)) + np.nan
+    if haralick.shape != (4, 13):  haralick = np.zeros((4, 13)) + np.nan
+    
+    return haralick
+
+
+def haralick_AveragedTFs(subimage):
+
+    # FOR COMPUTING GLCM,
+    # USE SCIKIT-IMAGE PACKAGE WHICH CAN HANDLE MULTIPLE CO-OCCURANCE DISTANCE.
+    # FOR AVERAGNIG TEXTURE FEATURES FROM MULTIPLE DISTANCES, TAKE MEAN AT FEATURE LEVEL
+    cooccuranceDistances = range(1,np.min(subimage.shape)//2)
+    directions = [0, np.pi/4, np.pi/2, 3*np.pi/4]
+    glcmDim = int(np.max(subimage)+1)
+    glcm = greycomatrix( subimage, distances=cooccuranceDistances, \
+                         angles=directions, levels=glcmDim, \
+                         symmetric=True, normed=True )
+    haralick = np.zeros((len(cooccuranceDistances),4,13))
+    for distIdx in range(glcm.shape[2]):
+        glcm_subset = np.swapaxes(glcm[:,:,distIdx,:].T,1,2)
+        try:
+            tmp_haralick = \
+                mahotas.features.texture.haralick_features(glcm_subset, ignore_zeros=True)
+        except ValueError:
+            tmp_haralick = np.zeros((4, 13)) + np.nan
+        if tmp_haralick.shape != (4, 13):  tmp_haralick = np.zeros((4, 13)) + np.nan
+        haralick[distIdx] = tmp_haralick
+    haralick = np.nanmean(haralick,axis=0)
+
+    return haralick
 
 
 def call_haralick0(subimage):
@@ -166,7 +214,7 @@ def convert2gray(iarray, vmin, vmax, l):
     return iarray.astype('uint8')
 
 
-def get_texture_features(iarray, ws, stp, threads, alg):
+def get_texture_features0(iarray, ws, stp, threads, alg):
     ''' Calculate Haralick texture features 
         using mahotas package and scikit-image package
 
@@ -203,6 +251,72 @@ def get_texture_features(iarray, ws, stp, threads, alg):
     # apply calculation of Haralick texture features in many threads
     # in row-wise order
     call_haralick = eval('call_haralick%d' % alg)
+    print('Compute GLCM and extract Haralick texture features')
+    harList = []
+    for r in range(0, iarray.shape[0]-ws-1, stp):
+        sys.stdout.write('\rRow number: %5d' % r)
+        sys.stdout.flush()
+        # collect all subimages in the row into one list
+        subImgs = [iarray[r:r+ws, c:c+ws] for c in range(0, iarray.shape[1]-ws-1, stp)]
+        # calculate Haralick texture features in all sub-images in this row
+        # using multiprocessing (parallel computing)
+        harRow = pool.map(call_haralick, subImgs)
+        # keep vectors with calculated texture features
+        harList.append(np.array(harRow))
+        # call_haralick should always return vector with size 4 x 13.
+        # in unlikely case it fails raise an error
+        if np.array(harRow).shape != (len(subImgs), 4, 13):
+            raise
+    print('...done.')
+
+    # terminate parallel processing. THIS IS IMPORTANT!!!
+    pool.close()
+
+    # convert list with texture features to array
+    harImage = np.array(harList)
+
+    # calculate directional mean
+    harImageAnis = harImage.mean(axis=2)
+
+    pool.close()
+    # reshape matrix and make images to be on the first dimension
+    return np.swapaxes(harImageAnis.T, 1, 2)
+
+
+def get_texture_features(iarray, ws, stp, threads, alg):
+    ''' Calculate Haralick texture features 
+        using mahotas package and scikit-image package
+
+    Parameters
+    ----------
+        iarray : ndarray
+            2D input data with gray levels
+        ws : int
+            size of subwindow
+        stp : int
+            step of sub-window floating
+        threads : int
+            number of parallel processes
+        alg : str
+            'averagedGLCM' : compute averaged texture from multi-coocurrence 
+                             distance by taking mean at Haralick feature level
+            'averagedTFs' : compute averaged texture from multi-coocurrence 
+                            distance by taking mean at GLCM level
+
+    Returns
+    -------
+        harImageAnis : ndarray
+            [13 x ROWS x COLS] array with texture features descriptors
+            13 - nuber of texture features
+            ROWS = rows of input image / stp
+            COLS = rows of input image / stp
+    '''
+    # init parallel processing
+    pool = Pool(threads)
+
+    # apply calculation of Haralick texture features in many threads
+    # in row-wise order
+    call_haralick = eval('haralick_'+alg)
     print('Compute GLCM and extract Haralick texture features')
     harList = []
     for r in range(0, iarray.shape[0]-ws-1, stp):
@@ -303,7 +417,7 @@ def compute_transform_coeffs(tf, **kwargs):
     return newTF, [tfSkew, transPar1, transPar2, newTFMean, newTFStd]
 
 
-def normalize_texture_features(tfs, normFile, **kwargs):
+def normalize_texture_features(tfs, normFile, skew_thres=0):
     ''' Transform, center on mean and normalize by STD each TF
         
         Load from prepared file values of transform coefficients, mean and STD for each TF
@@ -314,17 +428,10 @@ def normalize_texture_features(tfs, normFile, **kwargs):
                 3D matrix with all texture features [13 x rows x cols]
             normFile : str
                 name of file with log-flag, mean and STD
-            algorithm : str, optional
-                transform type. Default is 'log'.
-                'log'
-                    apply log transform for positively skewed data.
-                    apply exponential transform for negatively skewed data.
-                'boxcox'
-                    apply Box-Cox transform using given lambda value in normFile
             skew_thres : float, optional
                 skewness threshold for determining the application of transform.
                 data having skewness lower than this threshold will not be transformed.
-                Default is 2.
+                Default is 0
             
         Returns
         -------
@@ -332,25 +439,13 @@ def normalize_texture_features(tfs, normFile, **kwargs):
                 3D matrix with normalized texture features (same size, dtype)
         '''
     
-    for key in kwargs:
-        if key not in [ 'algorithm' , 'skew_thres' ]:
-            raise KeyError("normalize_texture_features() got an unexpected keyword argument '%s'" % key)
 
-    if 'algorithm' not in kwargs:
-        kwargs['algorithm'] = 'log'
-    elif kwargs['algorithm'] not in ['log','boxcox']:
-        raise KeyError("kwargs['algorithm'] got an invalid value '%s'"
-                       % kwargs['algorithm'])
-
-    if 'skew_thres' not in kwargs:
-        kwargs['skew_thres'] = 2.
-
-    algorithm = kwargs['algorithm']
-    skew_thres = np.abs(np.float(kwargs['skew_thres']))
-
+    skew_thres = np.abs(np.float(skew_thres))
 
     # load log-flag, mean and STD
-    normCoeffs = np.load(normFile)
+    algorithm = np.load(normFile)['normAlg']
+    normCoeffs = np.load(normFile)['normCoeffs']
+    
     # make copy of tfs
     tfsNorm = np.array(tfs)
 
@@ -423,17 +518,15 @@ def apply_svm(tfs, svmFile, threads):
     return svmLabelsAll.reshape(tfs.shape[1], tfs.shape[2])
 
 
-def get_map(s1i, bands, vmin, vmax,
-                l=64, ws=32, stp=32, threads=2,
-                normFiles=None, svmFile=None):
+def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
     '''Get raster map with classification results
 
     Parameters
     ----------
         s1i : Sentinel1Image
             Nansat chiled with SAR data
-        bands : list of strings or integers
-            IDs of bands to calculate texture features from
+        mLook : int
+            multi-look factor
         vmin : list of floats
             minimum values used for scaling to gray levesl
         vmax : list of floats
@@ -444,6 +537,9 @@ def get_map(s1i, bands, vmin, vmax,
             sub-window size to calculate textures in
         stp : int
             step of sub-window floating
+        tfAlg : str
+            texture feature extraction algorithm. 
+            choose from ['averagedGLCM','averagedTFs']
         threads : int
             number of parallell processes
         normFiles : list of str
@@ -457,38 +553,59 @@ def get_map(s1i, bands, vmin, vmax,
             with size = input_image.shape() / stp
         '''
 
-    # get water mask
-    wm = s1i.watermask()[1]
+    print 'denoising and multi-look ... '
+    sys.stdout.flush()
+    start_time = time.time()
+    for pol in ['HH','HV']:
+        s1i.add_denoised_band( 'sigma0_%s' % pol, denoAlg='NERSC', addPow='EW0',
+            angDepCor=True, snrDepCor=True, fillVoid=False, dBconv=False )
+    skipGCPs = 4          # choose from [1,2,4,5]
+    if mLook!=1:
+        skipGCPs = np.ceil(skipGCPs/float(mLook))
+        s1i.resize(factor=1./mLook)
+    end_time = time.time()
+    print '%s seconds' % (end_time-start_time)
 
-    # container for texture features from all bands (e.g. both HH and HV)
+    print 'watermask generation ... '
+    sys.stdout.flush()
+    start_time = time.time()
+    nGCPs = s1i.vrt.dataset.GetGCPCount()
+    GCPs = s1i.vrt.dataset.GetGCPs()
+    idx = np.arange(0,nGCPs).reshape(nGCPs//21,21)
+    skipGCPsRow = max( [ y for y in range(1,nGCPs//21)
+                         if ((nGCPs//21 -1) % y == 0) and y <= skipGCPs ] )
+    smpGCPs = [ GCPs[i] for i in np.concatenate(idx[::skipGCPsRow,::skipGCPs]) ]
+    GCPProj = s1i.vrt.dataset.GetGCPProjection()
+    dummy = s1i.vrt.dataset.SetGCPs(smpGCPs,GCPProj)
+    watermask = s1i.watermask(tps=True)[1]
+    dummy = s1i.vrt.dataset.SetGCPs(GCPs,GCPProj)
+    end_time = time.time()
+    print '%s seconds' % (end_time-start_time)
+
+    print 'texture feature computation and normalization ... '
+    sys.stdout.flush()
+    start_time = time.time()
+    sigma0 = {'HH':[],'HV':[]}
     tfs = []
-    for i, bandName in enumerate(bands):
-        # get array from the band
-        bandArray = s1i[bandName]
-
-        # convert to gray levels
-        bandArray = convert2gray(bandArray, vmin[i], vmax[i], l)
-
-        # mask away land
-        bandArray[wm == 2] = 0
-
-        # get texture features
-        tf = get_texture_features(bandArray, ws, stp, threads)
-
-        # normalize texture features
-        tf = normalize_texture_features(tf, normFiles[i])
-
-        # append texture features as 2D matrix [13 x total_size]
+    for pol in ['HH','HV']:
+        sigma0[pol] = 10*np.log10(s1i['sigma0_%s_denoised' % pol])
+        sigma0[pol] = convert2gray(sigma0[pol],vmin[pol],vmax[pol],l)
+        sigma0[pol][maximum_filter(watermask==2,ws)] = 0
+        tf = get_texture_features(sigma0[pol],ws,stp,threads,tfAlg)
+        tf = normalize_texture_features(tf,normFiles[pol],skew_thres=0)
         tfs.append(tf)
-
-    # stack texture features from all bands into single 3D matrix
-    # if two input bands only (e.g. HH and HV), size is [26 x rows x cols]
     tfs = np.vstack(tfs)
+    end_time = time.time()
+    print '%s seconds' % (end_time-start_time)
 
-    # apply SVM
-    lables = apply_svm(tfs, svmFile, threads)
+    print 'apply SVM ... '
+    sys.stdout.flush()
+    start_time = time.time()
+    labels = apply_svm(tfs, svmFile, threads)
+    end_time = time.time()
+    print '%s seconds' % (end_time-start_time)
 
-    return lables
+    return sigma0,labels
 
 
 def createKernel(radius):

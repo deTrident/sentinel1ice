@@ -6,17 +6,12 @@ import os, glob
 import numpy as np
 from sar2ice import compute_transform_coeffs
 from scipy.stats import skew
+from config import get_env
 
-"""
-Join Haralick texture features from many files
-Transform some of them
-Center on mean and normalize by STD
-Save normalized per input file
-"""
-trans_thres = 0.
-trans_alg = 'boxcox'
-idir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_TFs/'
-normFilePrefix = 'norm01'
+
+trans_alg = get_env()['textureFeatureNormalization']
+idir = get_env()['outputDirectory']
+normFilePrefix = get_env()['textureFeatureNormalizationFilePrefix']
 
 # find normalization coeeficients independently for HH and HV
 print('Compute coefficients for texture feature normalization.')
@@ -24,8 +19,8 @@ print('POL  TF#  TRANSFORM    oSKEW    oMIN    oMAX     nSKEW    nMIN    nMAX')
 
 for pol in ['HH', 'HV']:
     
-    normFile = os.path.join(idir, normFilePrefix + pol + '.npy')
-    ifiles = sorted(glob.glob(idir + '*%s_har.npz' % pol))
+    normFile = normFilePrefix+pol+'.npz'
+    ifiles = sorted(glob.glob(idir+'*/*%s_har.npz' % pol))
     # read TFs from many input images and keep in joinedTF
     joinedTF = []
     for ifile in ifiles:
@@ -60,4 +55,4 @@ for pol in ['HH', 'HV']:
         plt.close('all')
 
     # save log, mean and std to use in operational processing
-    np.save(normFile, normCoeffs)
+    np.savez(normFile, normAlg=trans_alg ,normCoeffs=normCoeffs)

@@ -6,11 +6,12 @@ import os, glob
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
 from sar2ice import normalize_texture_features
+from config import get_env
 
-idir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_TFs/'
-normFilePrefix = 'norm01'
-trans_thres = 0.
-trans_alg = 'boxcox'
+
+idir = get_env()['outputDirectory']
+normFilePrefix = get_env()['textureFeatureNormalizationFilePrefix']
+trans_thres = get_env()['skewnessThreshold']
 percentile = 0     # caution: clipping results in more void cells.
 gaus_size = 0.2 # c.a. 3 pixels
 
@@ -19,15 +20,15 @@ gaus_size = 0.2 # c.a. 3 pixels
 
 for pol in ['HH', 'HV']:
     
-    normFile = os.path.join(idir, normFilePrefix + pol + '.npy')
-    ifiles = sorted(glob.glob(idir + '*%s_har.npz' % pol))
+    normFile = normFilePrefix+pol+'.npz'
+    ifiles = sorted(glob.glob(idir+'*/*%s_har.npz' % pol))
     
     for ifile in ifiles:
         
         print('Texture features normalization of %s' %os.path.split(ifile)[1])
         tfs = np.load(ifile)['tfs']
         tfsNorm = normalize_texture_features(
-            tfs, normFile, algorithm=trans_alg, skew_thres=trans_thres )
+            tfs, normFile, skew_thres=trans_thres )
 
         # get min, max from histogram and clip
         for i, tf in enumerate(tfsNorm):

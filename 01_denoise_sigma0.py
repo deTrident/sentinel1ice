@@ -5,10 +5,12 @@ import matplotlib.pyplot as plt
 import os, glob, zipfile, shutil
 import numpy as np
 from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
+from config import get_env
+
 
 # find input files
-idir = '/Volumes/ExFAT2TB/Sentinel1A/FramStrait/'
-odir = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait_denoised/'
+idir = get_env()['inputDirectory']
+odir = get_env()['outputDirectory']
 ifiles = sorted(glob.glob(idir + 'S1A_EW_GRDM_1SDH*.zip'),reverse=False)
 '''
 minDate,maxDate = '20151220','20160331'
@@ -18,8 +20,11 @@ ifiles = [ ifile for ifile in ifiles
 for ifile in ifiles:
     
     ifilename = os.path.split(ifile)[1]
-    ofile = { 'HH': os.path.join(odir, ifilename[:-4]) + '_HH_s0.npz',
-              'HV': os.path.join(odir, ifilename[:-4]) + '_HV_s0.npz' }
+    ID = ifilename.split('.')[0]
+    if not os.path.exists(odir+ID):
+        os.mkdir(odir+ID)
+    ofile = { 'HH': os.path.join(odir+ID,ID+'_HH_sigma0.npz'),
+              'HV': os.path.join(odir+ID,ID+'_HV_sigma0.npz')  }
     if os.path.exists(ofile['HH']) and os.path.exists(ofile['HV']):
         continue
     else:
@@ -40,7 +45,7 @@ for ifile in ifiles:
                                fillVoid=False, dBconv=False )
 
         # multi-look
-        multiLookFactor = 1
+        multiLookFactor = get_env()['multiLookFactor']
         skipGCPs = 4          # choose from [1,2,4,5]
         if multiLookFactor!=1:
             skipGCPs = np.ceil(skipGCPs/float(multiLookFactor))
