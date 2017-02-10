@@ -553,8 +553,7 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
             with size = input_image.shape() / stp
         '''
 
-    sys.stdout.write('denoising and multi-look ... ')
-    start_time = time.time()
+    print('denoising and multi-look ...')
     for pol in ['HH','HV']:
         s1i.add_denoised_band( 'sigma0_%s' % pol, denoAlg='NERSC', addPow='EW0',
             angDepCor=True, snrDepCor=True, fillVoid=False, dBconv=False )
@@ -562,12 +561,8 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
     if mLook!=1:
         skipGCPs = np.ceil(skipGCPs/float(mLook))
         s1i.resize(factor=1./mLook)
-    end_time = time.time()
-    sys.stdout.write('%s seconds\n' % (end_time-start_time))
 
-    sys.stdout.write('watermask generation ... ')
-    sys.stdout.flush()
-    start_time = time.time()
+    print('watermask generation ... ')
     nGCPs = s1i.vrt.dataset.GetGCPCount()
     GCPs = s1i.vrt.dataset.GetGCPs()
     idx = np.arange(0,nGCPs).reshape(nGCPs//21,21)
@@ -578,12 +573,8 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
     dummy = s1i.vrt.dataset.SetGCPs(smpGCPs,GCPProj)
     watermask = s1i.watermask(tps=True)[1]
     dummy = s1i.vrt.dataset.SetGCPs(GCPs,GCPProj)
-    end_time = time.time()
-    sys.stdout.write('%s seconds\n' % (end_time-start_time))
 
-    sys.stdout.write('texture feature computation and normalization ... ')
-    sys.stdout.flush()
-    start_time = time.time()
+    print('texture feature extraction and normalization ...')
     sigma0 = {'HH':[],'HV':[]}
     tfs = []
     for pol in ['HH','HV']:
@@ -594,15 +585,9 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
         tf = normalize_texture_features(tf,normFiles[pol],skew_thres=0)
         tfs.append(tf)
     tfs = np.vstack(tfs)
-    end_time = time.time()
-    sys.stdout.write('%s seconds\n' % (end_time-start_time))
 
-    sys.stdout.write('apply SVM ... ')
-    sys.stdout.flush()
-    start_time = time.time()
+    print('apply SVM ...')
     labels = apply_svm(tfs, svmFile, threads)
-    end_time = time.time()
-    sys.stdout.write('%s seconds\n' % (end_time-start_time))
 
     return sigma0,labels
 
