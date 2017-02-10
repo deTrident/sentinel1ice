@@ -37,8 +37,8 @@ for ifile in ifiles:
     s1i = Sentinel1Image(ifile)
     sigma0, iceMask = get_map(
         s1i, mLook, vmin, vmax,l, ws, stp, tfAlg, threads, normFiles, svmFile )
-    plt.imsave( os.path.join(odir+ID,ID+'_HH_sigma0.png'),
+    plt.imsave( os.path.join(odir+ID,ID+'_HH_sigma0.jpg'),
                 sigma0['HH'], cmap='gray' )
-    plt.imsave( os.path.join(odir+ID,ID+'_HV_sigma0.png'),
+    plt.imsave( os.path.join(odir+ID,ID+'_HV_sigma0.jpg'),
                 sigma0['HV'], cmap='gray' )
     plt.imsave(os.path.join(odir+ID,ID+'_svm_zones.png'), iceMask)
