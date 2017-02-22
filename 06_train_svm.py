@@ -29,7 +29,7 @@ for ifile in ifiles:
     # read the image with my classification
     myZonesImg = np.array(Image.open(ifile))
     # if myZones was processed in full resolution, resize back to original size
-    if prod(myZonesImg.shape)/4 != (hhTF.shape[1]*hhTF.shape[2]):
+    if np.prod(myZonesImg.shape)/4 != (hhTF.shape[1]*hhTF.shape[2]):
         stp = get_env()['stepSize']
         myZonesImg = myZonesImg[stp-1::stp,stp-1::stp,:]
     myZones = np.zeros((myZonesImg.shape[0],myZonesImg.shape[1])) + np.nan

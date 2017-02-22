@@ -55,9 +55,8 @@ def get_env():
          != len(env['textureFeatureID']) ):
         raise KeyError('"textureFeatureID" contains wrong number.')
 
-    if ( sum([ID < env['numberOfPrincialComponent']
-              for ID in env['princialComponentID']])
-         != env['numberOfPrincialComponent'] ):
+    if not all([ ID < env['numberOfPrincialComponent']
+                 for ID in env['princialComponentID'] ]):
         raise KeyError('"princialComponentID" contains wrong number.')
 
     return env
