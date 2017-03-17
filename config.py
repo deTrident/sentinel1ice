@@ -3,8 +3,8 @@ import os
 def get_env():
 
     env = {}
-    env['inputDirectory'] = '/Volumes/ExFAT2TB/Sentinel1A/FramStrait/'
-    env['outputDirectory'] = '/Volumes/ExFAT2TB/Sentinel1A/odata_FramStrait/'
+    env['inputDirectory'] = '/Data/sat/downloads/sentinel1/sentinel1_classes/summer_data/'
+    env['outputDirectory'] = '/Data/sat/downloads/sentinel1/sentinel1_classes/summer_data/'
     env['textureFeatureNormalizationFilePrefix'] = 'norm01'
     env['myZonesSuffix'] = '_my_zones.png'
     env['supportVectorMachineFile'] = 'svm.pickle'
@@ -21,33 +21,33 @@ def get_env():
     env['textureFeatureID'] = [0,1,2,3,4,5,6,7,8,9,10,11,12]
     env['numberOfPrincialComponent'] = 6
     env['numberOfKmeansCluster'] = 15
-    env['princialComponentID'] = [0,1,2,3,4,5]
-    env['zoneColors'] = [100,200]
+    env['princialComponentID'] = [0,1,3,5]
+    env['zoneColors'] = [100,250]
 
     if not os.path.exists(env['inputDirectory']):
             raise IOError('cannot find input directory %s' % env['inputDirectory'])
-    
+
     if not os.path.exists(env['outputDirectory']):
             raise IOError('cannot find output directory %s' % env['outputDirectory'])
 
     if env['multiLookFactor']%1!=0 or env['multiLookFactor']<=0:
         raise ValueError('"multiLookFactor" must be positive integer.')
-    
+
     if env['stepSize']%1!=0 or env['stepSize']<=0:
         raise ValueError('"stepSize" must be positive integer.')
-    
+
     if env['subwindowSize']%1!=0 or env['subwindowSize']<=0:
         raise ValueError('"subwindowSize" must be positive integer.')
-    
+
     if env['grayLevel']%1!=0 or env['grayLevel']<=0:
         raise ValueError('"grayLevel" must be positive integer.')
-    
+
     if env['numberOfThreads']%1!=0 or env['numberOfThreads']<=0:
         raise ValueError('"numberOfThreads" must be positive integer.')
-    
+
     if env['textureFeatureAlgorithm'] not in ['averagedGLCM','averagedTFs']:
         raise KeyError('"textureFeatureAlgorithm" must be "averagedGLCM" or "averagedTFs".')
-    
+
     if env['textureFeatureNormalization'] not in ['log','boxcox']:
         raise KeyError('"textureFeatureNormalization" must be "log" or "boxcox".')
 
@@ -55,9 +55,8 @@ def get_env():
          != len(env['textureFeatureID']) ):
         raise KeyError('"textureFeatureID" contains wrong number.')
 
-    if ( sum([ID < env['numberOfPrincialComponent']
-              for ID in env['princialComponentID']])
-         != env['numberOfPrincialComponent'] ):
+    if not all([ ID < env['numberOfPrincialComponent']
+                 for ID in env['princialComponentID']]):
         raise KeyError('"princialComponentID" contains wrong number.')
 
     return env
