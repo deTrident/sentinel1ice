@@ -40,9 +40,9 @@ for ifile in ifiles:
         print 'Run denoising of sigma0_%s in %s' % (pol, ifilename)
         s1i = Sentinel1Image(ifilename)
         ### CAUTION: gap filling should be avoided. it distorts image statistics.
-        s1i.add_denoised_band( 'sigma0_%s' % pol, denoAlg='NERSC',
-                               addPow='EW0', angDepCor=True, snrDepCor=True,
-                               fillVoid=False, dBconv=False )
+        s1i.add_denoised_band( 'sigma0_%s' % pol,
+            denoAlg='NERSC', addPow='EW0', clipDirtyPx=True, adaptNoiSc=False,
+            angDepCor=True, fillVoid=False, dBconv=False, development=True )
 
         # multi-look
         multiLookFactor = get_env()['multiLookFactor']
