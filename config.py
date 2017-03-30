@@ -7,7 +7,7 @@ def get_env():
     env['outputDirectory'] = '/Data/sat/downloads/sentinel1/sentinel1_classes/summer_data/'
     env['textureFeatureNormalizationFilePrefix'] = 'norm01'
     env['myZonesSuffix'] = '_my_zones.png'
-    env['supportVectorMachineFile'] = 'svm.pickle'
+    env['supportVectorMachineFile'] = 'svm_ice_water_testver.pickle'
     env['multiLookFactor'] = 1
     env['stepSize'] = 25
     env['subwindowSize'] = 25
