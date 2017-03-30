@@ -6,10 +6,10 @@ import os, glob
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sar2ice import convert2fullres
+from sar2ice import convert2fullres, export_PS_proj_GTiff
 from config import get_env
 
-
+srcdir = get_env()['inputDirectory']
 idir = get_env()['outputDirectory']
 tfID = get_env()['textureFeatureID']     # index of TF to use for PCA
 nPC = get_env()['numberOfPrincialComponent']     # number of PC
@@ -74,6 +74,13 @@ for ifile in ifiles:
     ofile = ifile.replace('HH_har_norm','pca_zones')
     np.savez_compressed( ifile.replace('HH_har_norm','pca_zones'),
                          pcaData=pcaData, labels=labels )
+                         
+    # export geocoded labels
+    sourceFilename = glob.glob(
+        srcdir + os.path.split(ifile)[1].replace('_HH_har_norm.npz','.zip') )
+    if sourceFilename!=[]:
+        outputFilename = ifile.replace('HH_har_norm.npz','geocoded_pca_zones.tif')
+        export_PS_proj_GTiff(labels,sourceFilename,outputFilename)
 
     # vis. spatial distribution of PCAs and labels (map of zones)
     for ipc, pc in enumerate(pcaData):
