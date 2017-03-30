@@ -52,6 +52,8 @@ for ifile in ifiles:
             s1i.resize(factor=1./multiLookFactor)
 
         results['sigma0'] = 10*np.log10(s1i['sigma0_%s_denoised' % pol])
+        results['inc_ang'] = np.nanmean(s1i['incidence_angle'],axis=0)
+        results['ssw'] = s1i['subswath_indices']
         sigma0raw = 10*np.log10(s1i['sigma0_%s_raw' % pol])
 
         # generate watermask

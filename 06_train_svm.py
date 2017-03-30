@@ -27,6 +27,8 @@ for ifile in ifiles:
         continue
     hhTF = np.load(ifileHH)['tfsNorm'][tfID,:,:]
     hvTF = np.load(ifileHV)['tfsNorm'][tfID,:,:]
+    inc_ang = np.load(ifileHH)['inc_ang']
+    ssw = np.load(ifileHH)['ssw']
     # read the image with my classification
     myZonesImg = np.array(Image.open(ifile))
     # if myZones was processed in full resolution, resize back to original size
@@ -42,9 +44,9 @@ for ifile in ifiles:
         myZones[gpi] = zc
 
     # stack HH/HV textures and zones
-    imgData = np.vstack([hhTF,hvTF,myZones[None]])
+    imgData = np.vstack([hhTF,hvTF,inc_ang[None],ssw[None],myZones[None]])
     # reshape into stackable 2D matrix
-    imgData = imgData.reshape(2*len(tfID)+1,hhTF.shape[1]*hhTF.shape[2])
+    imgData = imgData.reshape(2*len(tfID)+3,hhTF.shape[1]*hhTF.shape[2])
 
     # append data from many images
     allData.append(imgData)
@@ -63,11 +65,11 @@ maxSize = 100000
 trnIndeces = randIndeces[:maxSize]
 tstIndeces = randIndeces[maxSize:maxSize+maxSize]
 
-trnTF = allDataGood[:len(tfID)*2, trnIndeces]
-trnZones = allDataGood[len(tfID)*2, trnIndeces]
+trnTF = allDataGood[:len(tfID)*2+2, trnIndeces]
+trnZones = allDataGood[len(tfID)*2+2, trnIndeces]
 
-tstTF = allDataGood[:len(tfID)*2, tstIndeces]
-tstZones = allDataGood[len(tfID)*2, tstIndeces]
+tstTF = allDataGood[:len(tfID)*2+2, tstIndeces]
+tstZones = allDataGood[len(tfID)*2+2, tstIndeces]
 
 # train SVM
 print 'Train SVM'
@@ -86,7 +88,6 @@ for tst_unique in np.unique(tstZones):
     bad_pix = svmZones[tst_pix] != tst_unique
     print tst_unique, len(tst_pix[tst_pix]), bad_pix[bad_pix].size / float(tst_pix[tst_pix].size)
 
-
 # apply SVM to all data for testing (in threads)
 ifilesHH = sorted(glob.glob(idir + '*/*_HH_har_norm.npz'))
 for ifileHH in ifilesHH:
@@ -95,8 +96,10 @@ for ifileHH in ifilesHH:
         continue
     hhTF = np.load(ifileHH)['tfsNorm'][tfID,:,:]
     hvTF = np.load(ifileHV)['tfsNorm'][tfID,:,:]
+    inc_ang = np.load(ifileHH)['inc_ang']
+    ssw = np.load(ifileHH)['ssw']
     # stack HH/HV textures and zones
-    tfs = np.vstack([hhTF, hvTF])
+    tfs = np.vstack([hhTF,hvTF,inc_ang[None],ssw[None]])
 
     svmMap = apply_svm(tfs, svmFile, threads)
     ofileSVM = ifileHH.replace('_HH_har_norm.npz', '_svm_zones.png')

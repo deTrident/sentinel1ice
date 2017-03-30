@@ -35,10 +35,15 @@ for ifile in ifiles:
         continue
     print ID
     s1i = Sentinel1Image(ifile)
-    sigma0, iceMask = get_map(
+    sigma0, tfs, iceMask = get_map(
         s1i, mLook, vmin, vmax,l, ws, stp, tfAlg, threads, normFiles, svmFile )
     plt.imsave( os.path.join(odir+ID,ID+'_HH_sigma0.jpg'),
                 sigma0['HH'], cmap='gray' )
     plt.imsave( os.path.join(odir+ID,ID+'_HV_sigma0.jpg'),
                 sigma0['HV'], cmap='gray' )
     plt.imsave(os.path.join(odir+ID,ID+'_svm_zones.png'), iceMask)
+    '''
+    for i in range(13):
+        plt.imsave( os.path.join(odir+ID,ID+'_HH_TF%02d.jpg' % i), tfs[i] )
+        plt.imsave( os.path.join(odir+ID,ID+'_HV_TF%02d.jpg' % i), tfs[i+13] )
+    '''

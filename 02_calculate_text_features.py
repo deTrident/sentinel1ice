@@ -24,11 +24,7 @@ ws  = get_env()['subwindowSize']    # 1km pixel spacing (40m * 25 = 1000m)
 l   = get_env()['grayLevel']    # gray-level. 32 or 64.
 threads = get_env()['numberOfThreads']
 alg = get_env()['textureFeatureAlgorithm']
-''' alg: TF computation algorithm flag
-        0 for conventional single-distance using mahotas
-        1 for multi-distance using mahotas (averaged TFs)
-        2 for multi-distance using scikit-image (averaged TFs)
-        3 for multi-distance using scikit-image (averaged GLCM) '''
+
 
 for ifile in ifiles:
     
@@ -48,6 +44,20 @@ for ifile in ifiles:
     print 'compute texture features'
     tfs = get_texture_features(sigma0,ws,stp,threads,alg)
     
+    # incidence angle
+    inc_ang0 = np.load(ifile)['inc_ang']
+    inc_ang = np.array([
+        np.mean(inc_ang0[c:c+ws]) for c in range(0,inc_ang0.shape[0]-ws-1,stp) ])
+    inc_ang = np.ones((tfs.shape[1],1))*inc_ang[np.newaxis,:]
+    
+    # subswath indices
+    ssw0 = np.load(ifile)['ssw'].astype(float)
+    ssw0[ssw0==0] = np.nan
+    ssw = np.ones(tfs.shape[1:])*np.nan
+    for i,r in enumerate(range(0, ssw0.shape[0]-ws-1, stp)):
+        ssw[i,:] = [ np.nanmean(ssw0[r:r+ws,c:c+ws])
+                     for c in range(0, ssw0.shape[1]-ws-1, stp) ]
+    
     # save each texture feature in a PNG
     for i, tf in enumerate(tfs):
         vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
@@ -57,4 +67,5 @@ for ifile in ifiles:
     # save texture features for further processing
     proc_params = { 'input_dimension':sigma0.shape, 'window_size':ws,
                     'step_size':stp, 'gray_level':l, 'glcm_algorithm':alg }
-    np.savez_compressed(ofile, tfs=tfs, proc_params=proc_params)
+    np.savez_compressed(
+        ofile, tfs=tfs, inc_ang=inc_ang, ssw=ssw, proc_params=proc_params )

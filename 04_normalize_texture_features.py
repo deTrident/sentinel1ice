@@ -50,6 +50,8 @@ for pol in ['HH', 'HV']:
                         tf, vmin=vmin, vmax=vmax )
         
         # save normalized texture features to output file
+        inc_ang = np.load(ifile)['inc_ang']
+        ssw = np.load(ifile)['ssw']
         proc_params = np.load(ifile)['proc_params']
         np.savez_compressed( ifile.replace('_har.npz','_har_norm.npz'),
-                             tfsNorm=tfsNorm, proc_params=proc_params )
+            tfsNorm=tfsNorm, inc_ang=inc_ang, ssw=ssw, proc_params=proc_params )
