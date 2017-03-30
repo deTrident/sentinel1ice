@@ -7,7 +7,6 @@ from skimage.feature import greycomatrix
 from scipy.ndimage import morphology, maximum_filter
 from scipy.stats import skew, boxcox
 from operator import add
-from nansat import Nansat, Domain
 clf = None
 
 
@@ -556,9 +555,8 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
 
     print('denoising and multi-look ...')
     for pol in ['HH','HV']:
-        s1i.add_denoised_band( 'sigma0_%s' % pol,
-            denoAlg='NERSC', addPow='EW0', clipDirtyPx=True, adaptNoiSc=False,
-            angDepCor=True, fillVoid=False, dBconv=False, development=True )
+        s1i.add_denoised_band( 'sigma0_%s' % pol, denoAlg='NERSC', addPow='EW0',
+            angDepCor=True, snrDepCor=True, fillVoid=False, dBconv=False )
     skipGCPs = 4          # choose from [1,2,4,5]
     if mLook!=1:
         skipGCPs = np.ceil(skipGCPs/float(mLook))
@@ -587,22 +585,11 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
         tf = normalize_texture_features(tf,normFiles[pol],skew_thres=0)
         tfs.append(tf)
     tfs = np.vstack(tfs)
-    inc_ang0 = np.nanmean(s1i['incidence_angle'],axis=0)
-    inc_ang = np.array([
-        np.mean(inc_ang0[c:c+ws]) for c in range(0,inc_ang0.shape[0]-ws-1,stp) ])
-    inc_ang = np.ones((tfs.shape[1],1))*inc_ang[np.newaxis,:]
-
-    ssw0 = s1i['subswath_indices'].astype(float)
-    ssw0[ssw0==0] = np.nan
-    ssw = np.ones(tfs.shape[1:])*np.nan
-    for i,r in enumerate(range(0, ssw0.shape[0]-ws-1, stp)):
-        ssw[i,:] = [ np.nanmean(ssw0[r:r+ws,c:c+ws])
-                     for c in range(0, ssw0.shape[1]-ws-1, stp) ]
 
     print('apply SVM ...')
-    labels = apply_svm(np.vstack([tfs,inc_ang[None],ssw[None]]), svmFile, threads)
+    labels = apply_svm(tfs, svmFile, threads)
 
-    return sigma0,tfs,labels
+    return sigma0,labels
 
 
 def createKernel(radius):
@@ -707,22 +694,4 @@ def slidingPatchProc(inputDataArray,inputSWindexArray,function,windowSize):
             subfunc_movingPatchProc, dataChunks,SWindexChunks )
 
     return outputDataArray[hWin:-hWin,hWin:-hWin]
-
-
-def export_PS_proj_GTiff(inputArray,sourceFilename,outputFilename):
-    
-    inputArray = np.array( (inputArray-np.nanmin(inputArray))
-        / (np.nanmax(inputArray)-np.nanmin(inputArray)) * 254 +1, dtype='uint8')
-    srcNansatObj = Nansat(sourceFilename)
-    resizeFac = srcNansatObj.shape()[1] / inputArray.shape[1]
-    srcNansatObj.crop(0,0,srcNansatObj.shape()[1]/resizeFac*resizeFac,
-                          srcNansatObj.shape()[0]/resizeFac*resizeFac)
-    srcNansatObj.resize(1./resizeFac)
-    newNansatObj = Nansat( domain=srcNansatObj, array= inputArray,
-                           parameters={'name':'new_band'} )
-    newDomain = Domain("+proj=stere +lat_0=90 +lat_ts=71 +lon_0=0 +k=1 ",
-                       "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
-                       ds=srcNansatObj.vrt.dataset)
-    newNansatObj.reproject(newDomain)
-    newNansatObj.write_geotiffimage(outputFilename,'new_band')
 
