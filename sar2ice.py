@@ -720,8 +720,8 @@ def export_PS_proj_GTiff(inputArray,sourceFilename,outputFilename):
     srcNansatObj.resize(1./resizeFac)
     newNansatObj = Nansat( domain=srcNansatObj, array= inputArray,
                            parameters={'name':'new_band'} )
-    newDomain = Domain("+proj=stere +lat_0=90 +lat_ts=71 +lon_0=0 +k=1 ",
-                       "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
+    newDomain = Domain("+proj=stere +lat_0=90 +lat_ts=71 +lon_0=0 +k=1 "
+                       + "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
                        ds=srcNansatObj.vrt.dataset)
     newNansatObj.reproject(newDomain)
     newNansatObj.write_geotiffimage(outputFilename,'new_band')
