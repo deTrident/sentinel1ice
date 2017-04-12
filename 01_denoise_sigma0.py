@@ -5,17 +5,18 @@ import matplotlib.pyplot as plt
 import os, glob, zipfile, shutil
 import numpy as np
 from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
+from sar2ice import export_uint8_jpeg
 from config import get_env
 
 
 # find input files
 idir = get_env()['inputDirectory']
 odir = get_env()['outputDirectory']
-ifiles = sorted(glob.glob(idir + 'S1A_EW_GRDM_1SDH*.zip'),reverse=False)
+ifiles = sorted(glob.glob(idir+'S1[AB]_EW_GRDM_1SDH_*.zip'),reverse=False)
 '''
 minDate,maxDate = '20151220','20160331'
 ifiles = [ ifile for ifile in ifiles
-          if minDate <= os.path.split(ifile)[-1][17:25] <= maxDate ]
+           if minDate <= os.path.split(ifile)[-1][17:25] <= maxDate ]
 '''
 for ifile in ifiles:
     
@@ -82,10 +83,16 @@ for ifile in ifiles:
         vmin, vmax = np.percentile(
             results['sigma0'][ np.isfinite(results['sigma0'])
                                * (results['wm']!=2) ], (1.,99.) )
+        '''
         plt.imsave( ofile[pol].replace('.npz','_original.jpg'), sigma0raw,
                     vmin=vmin, vmax=vmax, cmap='gray')
         plt.imsave( ofile[pol].replace('.npz','_denoised.jpg'), results['sigma0'],
                     vmin=vmin, vmax=vmax, cmap='gray')
+        '''
+        export_uint8_jpeg( ofile[pol].replace('.npz','_original.jpg'),
+                                sigma0raw, vmin=vmin, vmax=vmax )
+        export_uint8_jpeg( ofile[pol].replace('.npz','_denoised.jpg'),
+                                results['sigma0'], vmin=vmin, vmax=vmax )
 
         # save denoised data
         np.savez_compressed(ofile[pol] , **results)

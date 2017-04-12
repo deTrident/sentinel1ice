@@ -6,7 +6,7 @@ import os, glob
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sar2ice import convert2fullres, export_PS_proj_GTiff
+from sar2ice import convert2fullres, export_PS_proj_GTiff, export_uint8_png
 from config import get_env
 
 srcdir = get_env()['inputDirectory']
@@ -45,7 +45,8 @@ labelsGood = KMeans(n_clusters=nCluster).fit_predict(pcaDataGood[:,pcID])
 # colored by clusters
 print 'make scatter plots'
 for i in range(nPC-1):
-    plt.scatter(pcaDataGood[:,i],pcaDataGood[:,i+1],1,labelsGood,linewidths=0)
+    plt.scatter( pcaDataGood[:,i],pcaDataGood[:,i+1],1,labelsGood,
+                 linewidths=0,cmap='jet' )
     plt.savefig( idir+'scatter%d%d.png' %(i,i+1),dpi=150,
                  bbox_inches='tight',pad_inches=0 )
     plt.close('all')
@@ -77,7 +78,7 @@ for ifile in ifiles:
                          
     # export geocoded labels
     sourceFilename = glob.glob(
-        srcdir + os.path.split(ifile)[1].replace('_HH_har_norm.npz','.zip') )
+        srcdir + os.path.split(ifile)[1].replace('_HH_har_norm.npz','.zip') )[0]
     if sourceFilename!=[]:
         outputFilename = ifile.replace('HH_har_norm.npz','geocoded_pca_zones.tif')
         export_PS_proj_GTiff(labels,sourceFilename,outputFilename)
@@ -85,18 +86,32 @@ for ifile in ifiles:
     # vis. spatial distribution of PCAs and labels (map of zones)
     for ipc, pc in enumerate(pcaData):
         vmin, vmax = np.percentile( pc[np.isfinite(pc)],(2.5,97.5) )
+        '''
         plt.imsave( ifile.replace('HH_har_norm.npz','pc%02d.png' % ipc),
                     pc,vmin=vmin,vmax=vmax )
-
+        '''
+        export_uint8_png( ifile.replace('HH_har_norm.npz','pc%02d.png' % ipc),
+                          pc, cmap='jet', vmin=vmin, vmax=vmax )
     # save full-size zones (zoom WS-times)
     fs_dim = np.load(ifile)['proc_params'].item()['input_dimension']
     ws = np.load(ifile)['proc_params'].item()['window_size']
+    '''
     plt.imsave( ifile.replace('HH_har_norm.npz','zones_highres.png'),
-                convert2fullres(labels,fs_dim,ws) )
-
+                convert2fullres(labels,fs_dim,ws), cmap='jet' )
+    '''
+    export_uint8_png( ifile.replace('HH_har_norm.npz','zones_highres.png'),
+                      convert2fullres(labels,fs_dim,ws), cmap='jet' )
     # save original zones and make corresponding backscattering images
-    plt.imsave(ifile.replace('HH_har_norm.npz','zones.png'),labels)
+    '''
+    plt.imsave(ifile.replace('HH_har_norm.npz','zones.png'),labels,cmap='jet')
     plt.imsave( ifile.replace('HH_har_norm.npz','HH_sigma0_lowres.png'),
                 np.load(ifile)['tfsNorm'][5],cmap='gray' )
     plt.imsave( ifile.replace('HH_har_norm.npz','HV_sigma0_lowres.png'),
                 np.load(ifile.replace('_HH_','_HV_'))['tfsNorm'][5],cmap='gray' )
+    '''
+    export_uint8_png( ifile.replace('HH_har_norm.npz','zones.png'),
+                      labels, vmin=0, cmap='jet', vmax=nCluster-1 )
+    export_uint8_png( ifile.replace('HH_har_norm.npz','HH_sigma0_lowres.png'),
+                      np.load(ifile)['tfsNorm'][5], cmap='gray' )
+    export_uint8_png( ifile.replace('HH_har_norm.npz','HV_sigma0_lowres.png'),
+                      np.load(ifile.replace('_HH_','_HV_'))['tfsNorm'][5], cmap='gray' )

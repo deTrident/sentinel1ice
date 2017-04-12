@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
-from sar2ice import normalize_texture_features
+from sar2ice import normalize_texture_features, export_uint8_png
 from config import get_env
 
 
@@ -46,8 +46,10 @@ for pol in ['HH', 'HV']:
         # save each normalized texture feature in a PNG
         for i, tf in enumerate(tfsNorm):
             vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
-            plt.imsave( ifile.replace('har.npz','har%02d_norm.png' % i),
-                        tf, vmin=vmin, vmax=vmax )
+            #plt.imsave( ifile.replace('har.npz','har%02d_norm.png' % i),
+            #            tf, vmin=vmin, vmax=vmax )
+            export_uint8_png( ifile.replace('har.npz','har%02d_norm.png' % i),
+                              tf, cmap='jet', vmin=vmin, vmax=vmax )
         
         # save normalized texture features to output file
         inc_ang = np.load(ifile)['inc_ang']
