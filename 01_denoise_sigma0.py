@@ -7,30 +7,33 @@ import numpy as np
 from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
 from config import get_env
 
+env = get_env()
 
-# find input files
-idir = get_env()['inputDirectory']
-odir = get_env()['outputDirectory']
-ifiles = sorted(glob.glob(idir + 'S1A_EW_GRDM_1SDH*.zip'),reverse=False)
-'''
-minDate,maxDate = '20151220','20160331'
-ifiles = [ ifile for ifile in ifiles
-          if minDate <= os.path.split(ifile)[-1][17:25] <= maxDate ]
-'''
+ifiles = sorted(glob.glob(env['inputDirectory'] + env['wildcard']))
+#from laptevsea import ifiles
+
+# filter by dates
+if env['minDate'] is not None and env['maxDate'] is not None:
+    ifiles = [ifile for ifile in ifiles
+        if env['minDate'] <= os.path.split(ifile)[-1][17:25] <= env['maxDate'] ]
+
 for ifile in ifiles:
-    
     ifilename = os.path.split(ifile)[1]
     ID = ifilename.split('.')[0]
-    if not os.path.exists(odir+ID):
-        os.mkdir(odir+ID)
-    ofile = { 'HH': os.path.join(odir+ID,ID+'_HH_sigma0.npz'),
-              'HV': os.path.join(odir+ID,ID+'_HV_sigma0.npz')  }
+    wdir = os.path.join(env['outputDirectory'], ID)
+    if not os.path.exists(wdir):
+        os.mkdir(wdir)
+    ofile = { 'HH': os.path.join(wdir,ID+'_HH_sigma0.npz'),
+              'HV': os.path.join(wdir,ID+'_HV_sigma0.npz')  }
     if os.path.exists(ofile['HH']) and os.path.exists(ofile['HV']):
         continue
-    else:
+
+    if env['unzipInput']:
         with zipfile.ZipFile(ifile, "r") as z:
             z.extractall()
-    ifilename = ifilename[:-3]+'SAFE'
+        ifilename = ifilename[:-3]+'SAFE'
+    else:
+        ifilename = ifile
 
     for pol in ['HH','HV']:
         
@@ -42,10 +45,10 @@ for ifile in ifiles:
         ### CAUTION: gap filling should be avoided. it distorts image statistics.
         s1i.add_denoised_band( 'sigma0_%s' % pol,
             denoAlg='NERSC', addPow='EW0', clipDirtyPx=True, adaptNoiSc=False,
-            angDepCor=True, fillVoid=False, dBconv=False, development=True )
+            angDepCor=True, fillVoid=False, dBconv=False, development=env['development'])
 
         # multi-look
-        multiLookFactor = get_env()['multiLookFactor']
+        multiLookFactor = env['multiLookFactor']
         skipGCPs = 4          # choose from [1,2,4,5]
         if multiLookFactor!=1:
             skipGCPs = np.ceil(skipGCPs/float(multiLookFactor))
@@ -77,6 +80,7 @@ for ifile in ifiles:
             results['sigma0'][ np.isfinite(results['sigma0'])*(results['wm']!=2) ],
             bins=bin_edges )
 
+        """
         # create quickview
         print 'Make full resolution JPG'
         vmin, vmax = np.percentile(
@@ -86,10 +90,11 @@ for ifile in ifiles:
                     vmin=vmin, vmax=vmax, cmap='gray')
         plt.imsave( ofile[pol].replace('.npz','_denoised.jpg'), results['sigma0'],
                     vmin=vmin, vmax=vmax, cmap='gray')
+        """
 
         # save denoised data
         np.savez_compressed(ofile[pol] , **results)
         del s1i
 
-    if os.path.exists(ifilename):
+    if os.path.exists(ifilename) and env['unzipInput']:
         shutil.rmtree(ifilename)

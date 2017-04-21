@@ -3,8 +3,14 @@ import os
 def get_env():
 
     env = {}
-    env['inputDirectory'] = '/Data/sat/downloads/sentinel1/sentinel1_classes/summer_data/'
-    env['outputDirectory'] = '/Data/sat/downloads/sentinel1/sentinel1_classes/summer_data/'
+    env['inputDirectory'] = '/Data/sat/downloads/sentinel1/'
+    env['outputDirectory'] = '/Data/sat/downloads/sentinel1/tmp/'
+    #env['outputDirectory'] = '/Data/sat/downloads/sentinel1/sentinel1_classes/laptev_sea/'
+    env['minDate'] = '20170320'
+    env['maxDate'] = '20170405'
+    env['wildcard'] = 'S1?_EW_GRDM_1SDH_20170[3,4]*.zip'
+    env['unzipInput'] = False
+    env['development'] = False
     env['textureFeatureNormalizationFilePrefix'] = 'norm01'
     env['myZonesSuffix'] = '_my_zones.png'
     env['supportVectorMachineFile'] = 'svm_ice_water_testver.pickle'
