@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
 from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
-from sar2ice import get_map
+from sar2ice import get_map, export_uint8_jpeg, export_uint8_png, export_PS_proj_GTiff
 from config import get_env
 
 
@@ -37,13 +37,18 @@ for ifile in ifiles:
     s1i = Sentinel1Image(ifile)
     sigma0, tfs, iceMask = get_map(
         s1i, mLook, vmin, vmax,l, ws, stp, tfAlg, threads, normFiles, svmFile )
+    '''
     plt.imsave( os.path.join(odir+ID,ID+'_HH_sigma0.jpg'),
                 sigma0['HH'], cmap='gray' )
     plt.imsave( os.path.join(odir+ID,ID+'_HV_sigma0.jpg'),
                 sigma0['HV'], cmap='gray' )
     plt.imsave(os.path.join(odir+ID,ID+'_svm_zones.png'), iceMask)
     '''
+    export_uint8_jpeg( os.path.join(odir+ID,ID+'_HH_sigma0.jpg'), sigma0['HH'] )
+    export_uint8_jpeg( os.path.join(odir+ID,ID+'_HV_sigma0.jpg'), sigma0['HV'] )
+    export_uint8_png(os.path.join(odir+ID,ID+'_svm_zones.png'), iceMask)
+    export_PS_proj_GTiff(iceMask,ifile,os.path.join(odir+ID,ID+'_geocoded_svm_zones.tif'))
+
     for i in range(13):
-        plt.imsave( os.path.join(odir+ID,ID+'_HH_TF%02d.jpg' % i), tfs[i] )
-        plt.imsave( os.path.join(odir+ID,ID+'_HV_TF%02d.jpg' % i), tfs[i+13] )
-    '''
+        export_uint8_png( os.path.join(odir+ID,ID+'_HH_har%02d_norm.jpg' % i), tfs[i] )
+        export_uint8_png( os.path.join(odir+ID,ID+'_HV_har%02d_norm.jpg' % i), tfs[i+13] )

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
 from multiprocessing import Pool
-from sar2ice import convert2gray, get_texture_features
+from sar2ice import convert2gray, get_texture_features, export_uint8_png
 from scipy.ndimage import maximum_filter
 from config import get_env
 
@@ -61,9 +61,11 @@ for ifile in ifiles:
     # save each texture feature in a PNG
     for i, tf in enumerate(tfs):
         vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
-        plt.imsave( ofile.replace('har.npz','har%02d.png' % i),
-                    tf, vmin=vmin, vmax=vmax )
-    
+        #plt.imsave( ofile.replace('har.npz','har%02d.png' % i),
+        #            tf, vmin=vmin, vmax=vmax )
+        export_uint8_png( ofile.replace('har.npz','har%02d.png' % i),
+                          tf, cmap='jet', vmin=vmin, vmax=vmax )
+
     # save texture features for further processing
     proc_params = { 'input_dimension':sigma0.shape, 'window_size':ws,
                     'step_size':stp, 'gray_level':l, 'glcm_algorithm':alg }

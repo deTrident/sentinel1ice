@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import os, glob, zipfile, shutil
 import numpy as np
 from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
+from sar2ice import export_uint8_jpeg
 from config import get_env
 
 env = get_env()
 
 ifiles = sorted(glob.glob(env['inputDirectory'] + env['wildcard']))
-#from laptevsea import ifiles
 
 # filter by dates
 if env['minDate'] is not None and env['maxDate'] is not None:
@@ -80,17 +80,21 @@ for ifile in ifiles:
             results['sigma0'][ np.isfinite(results['sigma0'])*(results['wm']!=2) ],
             bins=bin_edges )
 
-        """
         # create quickview
         print 'Make full resolution JPG'
         vmin, vmax = np.percentile(
             results['sigma0'][ np.isfinite(results['sigma0'])
                                * (results['wm']!=2) ], (1.,99.) )
+        '''
         plt.imsave( ofile[pol].replace('.npz','_original.jpg'), sigma0raw,
                     vmin=vmin, vmax=vmax, cmap='gray')
         plt.imsave( ofile[pol].replace('.npz','_denoised.jpg'), results['sigma0'],
                     vmin=vmin, vmax=vmax, cmap='gray')
-        """
+        '''
+        export_uint8_jpeg( ofile[pol].replace('.npz','_original.jpg'),
+                                sigma0raw, vmin=vmin, vmax=vmax )
+        export_uint8_jpeg( ofile[pol].replace('.npz','_denoised.jpg'),
+                                results['sigma0'], vmin=vmin, vmax=vmax )
 
         # save denoised data
         np.savez_compressed(ofile[pol] , **results)

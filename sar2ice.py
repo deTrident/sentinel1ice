@@ -1,5 +1,6 @@
 import os, sys, glob, mahotas, pickle, time
 import numpy as np
+import matplotlib;    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from sklearn import svm
@@ -8,7 +9,20 @@ from scipy.ndimage import morphology, maximum_filter
 from scipy.stats import skew, boxcox
 from operator import add
 from nansat import Nansat, Domain
+from PIL import Image
 clf = None
+
+
+
+# GLCM computation result from MAHOTAS is different from that of SCIKIT-IMAGE.
+# MAHOTAS considers distance as number of cells in given direction.
+# SCKIT-IMAGE considers distance as euclidian distance, and take values form
+# the nearest neighbor when the euclidian distance is not integer.
+# e.g.) reference cell coordinate (100,100), direction = 45 deg., distance = 3
+# MAHOTAS counts co-occurence pair between (100,100) and (103,103).
+# SCIKIT-IMAGE counts co-occurence pair between (100,100) and (102,102), because
+# a euclidian distance of 3 in direction of 45 degree corresponds to 3/sqrt(2),
+# which is 2.121 along x and y coordinate, and 2.12 is closer to 2 rather than 3.
 
 
 def haralick_averagedGLCM(subimage):
@@ -59,118 +73,6 @@ def haralick_AveragedTFs(subimage):
     return haralick
 
 
-def call_haralick0(subimage):
-    ''' Caluculate Haralick texture features from a square subimage
-        Always return 4 x 13 matrix either with values for each angle or with NaN.
-        The is used for easy pickling (needed for multiprocessing)
-        Parameters
-        ----------
-        subimage : ndarray
-        2D array with data in UINT8
-        Returns
-        -------
-        haralick : ndarray
-        4 x 13 matrix with Haralick texture features or NaN
-        '''
-    try:
-        haralick = mahotas.features.haralick(subimage, True)
-    except ValueError:
-        haralick = np.zeros((4, 13)) + np.nan
-    if haralick.shape != (4, 13):  haralick = np.zeros((4, 13)) + np.nan
-
-    return haralick
-
-
-def call_haralick1(subimage):
-    ''' Caluculate Haralick texture features from a square subimage
-        
-        Always return 4 x 13 matrix either with values for each angle or with NaN.
-        The is used for easy pickling (needed for multiprocessing)
-        
-        Parameters
-        ----------
-        subimage : ndarray
-        2D array with data in UINT8
-        Returns
-        -------
-        haralick : ndarray
-        4 x 13 matrix with Haralick texture features or NaN
-        '''
-    cooccuranceDistances = range(1,np.min(subimage.shape)//2)
-    haralick = np.zeros((4,13))
-    for iDist in cooccuranceDistances:
-        try:
-            haralick = mahotas.features.haralick(
-                           subimage, ignore_zeros=True, distance=iDist )
-        except ValueError:
-            haralick = np.zeros((4, 13)) + np.nan
-        if haralick.shape != (4, 13):  haralick = np.zeros((4, 13)) + np.nan
-    haralick /= len(cooccuranceDistances)
-
-    return haralick
-
-
-# GLCM computation result from MAHOTAS is different from that of SCIKIT-IMAGE.
-# MAHOTAS considers distance as number of cells in given direction.
-# SCKIT-IMAGE considers distance as euclidian distance, and take values form
-# the nearest neighbor when the euclidian distance is not integer.
-# e.g.) reference cell coordinate (100,100), direction = 45 deg., distance = 3
-# MAHOTAS counts co-occurence pair between (100,100) and (103,103).
-# SCIKIT-IMAGE counts co-occurence pair between (100,100) and (102,102), because
-# a euclidian distance of 3 in direction of 45 degree corresponds to 3/sqrt(2),
-# which is 2.121 along x and y coordinate, and 2.12 is closer to 2 rather than 3.
-
-
-def call_haralick2(subimage):
-    
-    # FOR COMPUTING GLCM,
-    # USE SCIKIT-IMAGE PACKAGE WHICH CAN HANDLE MULTIPLE CO-OCCURANCE DISTANCE.
-    # FOR AVERAGNIG TEXTURE FEATURES FROM MULTIPLE DISTANCES, TAKE MEAN AT FEATURE LEVEL
-    
-    cooccuranceDistances = range(1,np.min(subimage.shape)//2)
-    directions = [0, np.pi/4, np.pi/2, 3*np.pi/4]
-    glcmDim = int(np.max(subimage)+1)
-    glcm = greycomatrix( subimage, distances=cooccuranceDistances, \
-                         angles=directions, levels=glcmDim, \
-                         symmetric=True, normed=True )
-    haralick = np.zeros((len(cooccuranceDistances),4,13))
-    for distIdx in range(glcm.shape[2]):
-        glcm_subset = np.swapaxes(glcm[:,:,distIdx,:].T,1,2)
-        try:
-            tmp_haralick = \
-                mahotas.features.texture.haralick_features(glcm_subset, ignore_zeros=True)
-        except ValueError:
-            tmp_haralick = np.zeros((4, 13)) + np.nan
-        if tmp_haralick.shape != (4, 13):  tmp_haralick = np.zeros((4, 13)) + np.nan
-        haralick[distIdx] = tmp_haralick
-    haralick = np.nanmean(haralick,axis=0)
-
-    return haralick
-
-
-def call_haralick3(subimage):
-    
-    # FOR COMPUTING GLCM,
-    # USE SCIKIT-IMAGE PACKAGE WHICH CAN HANDLE MULTIPLE CO-OCCURANCE DISTANCE.
-    # FOR AVERAGNIG TEXTURE FEATURES FROM MULTIPLE DISTANCES, TAKE MEAN AT GLCM LEVEL
-    
-    cooccuranceDistances = range(1,np.min(subimage.shape)//2)
-    directions = [0, np.pi/4, np.pi/2, 3*np.pi/4]
-    glcmDim = int(np.max(subimage)+1)
-    glcm = greycomatrix( subimage, distances=cooccuranceDistances, \
-                        angles=directions, levels=glcmDim, \
-                        symmetric=True, normed=True )
-    glcm = np.swapaxes(np.nanmean(glcm,axis=2).T,1,2)
-    try:
-        haralick = \
-            mahotas.features.texture.haralick_features( glcm,ignore_zeros=True )
-    except ValueError:
-        haralick = np.zeros((4, 13)) + np.nan
-    if haralick.shape != (4, 13):  haralick = np.zeros((4, 13)) + np.nan
-
-    return haralick
-
-
 def clf_predict(inputData):
     ''' Apply svm on some input data
     The is used for easy pickling (needed for multiprocessing)
@@ -213,75 +115,6 @@ def convert2gray(iarray, vmin, vmax, l):
 
     # return as unsigned integer
     return iarray.astype('uint8')
-
-
-def get_texture_features0(iarray, ws, stp, threads, alg):
-    ''' Calculate Haralick texture features 
-        using mahotas package and scikit-image package
-
-    Parameters
-    ----------
-        iarray : ndarray
-            2D input data with gray levels
-        ws : int
-            size of subwindow
-        stp : int
-            step of sub-window floating
-        threads : int
-            number of parallel processes
-        alg : int
-            algorithm selection for "call_haralick+[number]"
-            0 : compute texture from single coocurrence distance (using MAHOTAS)
-            1 : compute averaged texture from multi-coocurrence distance (using MAHOTAS)
-            2 : compute averaged texture from multi-coocurrence distance by
-                taking mean at Haralick feature level (using SCIKIT-IMAGE)
-            3 : compute averaged texture from multi-coocurrence distance by
-                taking mean at GLCM level (using SCIKIT-IMAGE)
-
-    Returns
-    -------
-        harImageAnis : ndarray
-            [13 x ROWS x COLS] array with texture features descriptors
-            13 - nuber of texture features
-            ROWS = rows of input image / stp
-            COLS = rows of input image / stp
-    '''
-    # init parallel processing
-    pool = Pool(threads)
-
-    # apply calculation of Haralick texture features in many threads
-    # in row-wise order
-    call_haralick = eval('call_haralick%d' % alg)
-    print('Compute GLCM and extract Haralick texture features')
-    harList = []
-    for r in range(0, iarray.shape[0]-ws-1, stp):
-        sys.stdout.write('\rRow number: %5d' % r)
-        sys.stdout.flush()
-        # collect all subimages in the row into one list
-        subImgs = [iarray[r:r+ws, c:c+ws] for c in range(0, iarray.shape[1]-ws-1, stp)]
-        # calculate Haralick texture features in all sub-images in this row
-        # using multiprocessing (parallel computing)
-        harRow = pool.map(call_haralick, subImgs)
-        # keep vectors with calculated texture features
-        harList.append(np.array(harRow))
-        # call_haralick should always return vector with size 4 x 13.
-        # in unlikely case it fails raise an error
-        if np.array(harRow).shape != (len(subImgs), 4, 13):
-            raise
-    print('...done.')
-
-    # terminate parallel processing. THIS IS IMPORTANT!!!
-    pool.close()
-
-    # convert list with texture features to array
-    harImage = np.array(harList)
-
-    # calculate directional mean
-    harImageAnis = harImage.mean(axis=2)
-
-    pool.close()
-    # reshape matrix and make images to be on the first dimension
-    return np.swapaxes(harImageAnis.T, 1, 2)
 
 
 def get_texture_features(iarray, ws, stp, threads, alg):
@@ -711,6 +544,9 @@ def slidingPatchProc(inputDataArray,inputSWindexArray,function,windowSize):
 
 def export_PS_proj_GTiff(inputArray,sourceFilename,outputFilename):
     
+    ### NaN is replaced by zero.
+    originalCmap = plt.rcParams['image.cmap']
+    plt.rcParams['image.cmap'] = 'jet'
     inputArray = np.array( (inputArray-np.nanmin(inputArray))
         / (np.nanmax(inputArray)-np.nanmin(inputArray)) * 254 +1, dtype='uint8')
     srcNansatObj = Nansat(sourceFilename)
@@ -720,9 +556,38 @@ def export_PS_proj_GTiff(inputArray,sourceFilename,outputFilename):
     srcNansatObj.resize(1./resizeFac)
     newNansatObj = Nansat( domain=srcNansatObj, array= inputArray,
                            parameters={'name':'new_band'} )
-    newDomain = Domain("+proj=stere +lat_0=90 +lat_ts=71 +lon_0=0 +k=1 ",
-                       "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
+    newDomain = Domain("+proj=stere +lat_0=90 +lat_ts=71 +lon_0=0 +k=1 "
+                       + "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
                        ds=srcNansatObj.vrt.dataset)
     newNansatObj.reproject(newDomain)
     newNansatObj.write_geotiffimage(outputFilename,'new_band')
+    plt.rcParams['image.cmap'] = originalCmap
 
+
+def export_uint8_png(outputFilename,inputData,cmap='jet',**kwargs):
+    
+    ### NaN is replaced by zero.
+    if 'vmin' not in kwargs:
+        kwargs['vmin'] = float(np.nanmin(inputData))
+    if 'vmax' not in kwargs:
+        kwargs['vmax'] = float(np.nanmax(inputData))
+    cfunc = eval('matplotlib.cm.'+cmap)
+    uint8Data = ( cfunc( (inputData-kwargs['vmin'])
+                      /(kwargs['vmax']-kwargs['vmin']))*254+1 ).astype(np.uint8)
+    uint8Data[np.isnan(inputData)] = [0,0,0,0]
+    RGBA = Image.fromarray(uint8Data)
+    RGBA.save(outputFilename,transparant=(0,0,0,0))
+
+
+def export_uint8_jpeg(outputFilename,inputData,**kwargs):
+    
+    ### NaN is replaced by zero.
+    if 'vmin' not in kwargs:
+        kwargs['vmin'] = float(np.nanmin(inputData))
+    if 'vmax' not in kwargs:
+        kwargs['vmax'] = float(np.nanmax(inputData))
+    uint8Data = (inputData-kwargs['vmin'])/(kwargs['vmax']-kwargs['vmin'])*254+1
+    uint8Data[uint8Data>255] = 255
+    uint8Data[uint8Data<1] = 1
+    uint8Data = uint8Data.astype(np.uint8)
+    GRAY = Image.fromarray(uint8Data).save(outputFilename)
