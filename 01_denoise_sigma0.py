@@ -48,7 +48,7 @@ for ifile in ifiles:
             angDepCor=True, fillVoid=False, dBconv=False, development=env['development'])
 
         # multi-look
-        multiLookFactor = env['multiLookFactor']
+        multiLookFactor = get_env()['multiLookFactor']
         skipGCPs = 4          # choose from [1,2,4,5]
         if multiLookFactor!=1:
             skipGCPs = np.ceil(skipGCPs/float(multiLookFactor))

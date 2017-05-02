@@ -6,7 +6,7 @@ import os, glob, pickle
 import numpy as np
 from PIL import Image
 from sklearn import svm
-from sar2ice import apply_svm, export_uint8_png
+from sar2ice import apply_svm, export_uint8_png, export_PS_proj_GTiff
 from config import get_env
 
 
@@ -105,10 +105,10 @@ for ifileHH in ifilesHH:
     svmMap = apply_svm(tfs, svmFile, threads)
     ofileSVM = ifileHH.replace('_HH_har_norm.npz', '_svm_zones.png')
     #plt.imsave(ofileSVM, svmMap)
-    export_uint8_png(ofileSVM,svmMap,cmap='jet',vmin=0,vmax=255)
+    export_uint8_png(ofileSVM,svmMap,cmap='jet')
     # export geocoded labels
     sourceFilename = glob.glob(
         srcdir + os.path.split(ifileHH)[1].replace('_HH_har_norm.npz','.zip') )[0]
     if sourceFilename!=[]:
-        outputFilename = ifile.replace('HH_har_norm.npz','geocoded_svm_zones.tif')
-        export_PS_proj_GTiff(labels,sourceFilename,outputFilename)
+        outputFilename = ifileHH.replace('HH_har_norm.npz','geocoded_svm_zones.tif')
+        export_PS_proj_GTiff(svmMap,sourceFilename,outputFilename)

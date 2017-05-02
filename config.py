@@ -9,10 +9,10 @@ def get_env():
     env['maxDate'] = '20170405'
     env['wildcard'] = 'S1?_EW_GRDM_1SDH_20170[3,4]*.zip'
     env['unzipInput'] = False
-    env['development'] = False
-    env['textureFeatureNormalizationFilePrefix'] = 'norm01'
+    env['development'] = True
+    env['textureFeatureNormalizationFilePrefix'] = 'normTFs_FramStraitWinter'
     env['myZonesSuffix'] = '_my_zones.png'
-    env['supportVectorMachineFile'] = 'svm_ice_water_testver.pickle'
+    env['supportVectorMachineFile'] = 'svm_FramStraitWinter.pickle'
     env['multiLookFactor'] = 1
     env['stepSize'] = 25
     env['subwindowSize'] = 25
