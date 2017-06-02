@@ -4,6 +4,8 @@ import matplotlib;    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from sklearn import svm
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
 from skimage.feature import greycomatrix
 from scipy.ndimage import morphology, maximum_filter
 from scipy.stats import skew, boxcox
@@ -307,6 +309,38 @@ def normalize_texture_features(tfs, normFile, skew_thres=0):
     return tfsNorm
 
 
+def apply_pca_Kmeans(tfs,tfID,nPC,pcID,nCluster):
+    ''' Apply PCA and Kmeans clustering to normalized texture features
+
+    Parameters
+    ----------
+        tfs : ndarray
+            3D matrix with normalized texture features [features x rows x cols]
+        tfID : list of int
+            texture feature ID to use for PCA
+        nPC : int
+            number of PC
+        pcID : list of int
+            PC ID to use for Kmeans clustering
+        nCluster : int
+            number of cluster
+    Returns
+    -------
+        labels : ndarray
+            nPC * 2D raster map with labels (or np.nan)
+    '''
+    tfs2D = tfs.reshape(tfs.shape[0], tfs.shape[1] * tfs.shape[2])
+    gpi = np.isfinite(tfs2D.sum(axis=0))
+    pcaDataGood = PCA(n_components=nPC).fit_transform(tfs2D[:,gpi].T)
+    labelsGood = KMeans(n_clusters=nCluster).fit_predict(pcaDataGood[:,pcID])
+    pcaDataAll = np.zeros((nPC, tfs2D.shape[1])) + np.nan
+    pcaDataAll[:,gpi] = pcaDataGood.T
+    labelsAll = np.zeros(tfs2D.shape[1]) + np.nan
+    labelsAll[gpi] = labelsGood
+
+    return labelsAll.reshape(tfs.shape[1],tfs.shape[2])
+
+
 def apply_svm(tfs, svmFile, threads):
     ''' Apply SVM to normalized texture features and lable each vector
 
@@ -321,7 +355,7 @@ def apply_svm(tfs, svmFile, threads):
     Returns
     -------
         labels : ndarray
-            1D vector with labels for each vector (or np.nan)
+            2D raster map with labels (or np.nan)
     '''
     global clf
     # load SVM from pre-saved file
@@ -352,40 +386,71 @@ def apply_svm(tfs, svmFile, threads):
     return svmLabelsAll.reshape(tfs.shape[1], tfs.shape[2])
 
 
-def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
+def get_map(s1i,env):
     '''Get raster map with classification results
 
     Parameters
     ----------
         s1i : Sentinel1Image
             Nansat chiled with SAR data
-        mLook : int
+        env['mLook'] : int
             multi-look factor
-        vmin : list of floats
+        env['vmin'] : list of floats
             minimum values used for scaling to gray levesl
-        vmax : list of floats
+        env['vmax'] : list of floats
             maximum values used for scaling to gray levesl
-        l : int
+        env['l'] : int
             number of gray levels
-        ws : int
+        env['ws'] : int
             sub-window size to calculate textures in
-        stp : int
+        env['stp'] : int
             step of sub-window floating
-        tfAlg : str
+        env['tfAlg'] : str
             texture feature extraction algorithm. 
             choose from ['averagedGLCM','averagedTFs']
-        threads : int
+        env['textureFeatureID'] : list of int
+            texture feature ID to use for PCA
+        env['numberOfPrincialComponent'] : int
+            number of PC
+        env['princialComponentID'] : list of int
+            PC ID to use for Kmeans clustering
+        env['numberOfKmeansCluster'] : int
+            number of cluster
+        env['threads'] : int
             number of parallell processes
-        normFiles : list of str
+        env['normFiles'] : list of str
             name of file to use for normalization of texture features
-        svmFile : str
+        env['svmFile'] : str
             name of file where SVM is stored
     Returns
     -------
-        map : ndarray
-            raster map with classification results
+        sigma0 : ndarray
+            raster map with gray-level converted backscattering coefficients
+        tfs : ndarray
+            raster map with texture features
+        pca_labels : ndarray
+            raster map with PCA based clustering results
+            with size = input_image.shape() / stp
+        svm_labels : ndarray
+            raster map with SVM based classification results
             with size = input_image.shape() / stp
         '''
+
+    mLook = env['multiLookFactor']
+    vmax = env['sigma0_max']
+    vmin = env['sigma0_min']
+    l   = env['grayLevel']    # gray-level. 32 or 64.
+    ws  = env['subwindowSize']    # 1km pixel spacing (40m * 25 = 1000m)
+    stp = env['stepSize']    # step size
+    tfAlg = env['textureFeatureAlgorithm']
+    tfID = env['textureFeatureID']
+    nPC = env['numberOfPrincialComponent']
+    pcID = env['princialComponentID']
+    nCluster = env['numberOfKmeansCluster']
+    threads = env['numberOfThreads']
+    normFiles = { 'HH':env['textureFeatureNormalizationFilePrefix']+'HH.npz',
+                  'HV':env['textureFeatureNormalizationFilePrefix']+'HV.npz' }
+    svmFile = env['supportVectorMachineFile']
 
     print('denoising and multi-look ...')
     for pol in ['HH','HV']:
@@ -432,10 +497,12 @@ def get_map(s1i,mLook,vmin,vmax,l,ws,stp,tfAlg,threads,normFiles,svmFile):
         ssw[i,:] = [ np.nanmean(ssw0[r:r+ws,c:c+ws])
                      for c in range(0, ssw0.shape[1]-ws-1, stp) ]
 
+    print('apply PCA and Kmeans clustering ...')
+    pca_labels = apply_pca_Kmeans(tfs, tfID, nPC, pcID, nCluster)
     print('apply SVM ...')
-    labels = apply_svm(np.vstack([tfs,inc_ang[None],ssw[None]]), svmFile, threads)
+    svm_labels = apply_svm(np.vstack([tfs,inc_ang[None],ssw[None]]), svmFile, threads)
 
-    return sigma0,tfs,labels
+    return sigma0,tfs,pca_labels,svm_labels
 
 
 def createKernel(radius):

@@ -8,23 +8,13 @@ from sentinel1denoised.S1_EW_GRD_NoiseCorrection import Sentinel1Image
 from sar2ice import get_map, export_uint8_jpeg, export_uint8_png, export_PS_proj_GTiff
 from config import get_env
 
+env = get_env()
 
 # find input files
-idir = get_env()['inputDirectory']
-odir = get_env()['outputDirectory']
-ifiles = sorted(glob.glob(idir + 'S1A_EW_GRDM_1SDH*.zip'),reverse=False)
+idir = env['inputDirectory']
+odir = env['outputDirectory']
+ifiles = sorted(glob.glob(env['inputDirectory'] + env['wildcard']))
 
-mLook = get_env()['multiLookFactor']
-vmax = get_env()['sigma0_max']
-vmin = get_env()['sigma0_min']
-stp = get_env()['stepSize']    # step size
-ws  = get_env()['subwindowSize']    # 1km pixel spacing (40m * 25 = 1000m)
-l   = get_env()['grayLevel']    # gray-level. 32 or 64.
-threads = get_env()['numberOfThreads']
-tfAlg = get_env()['textureFeatureAlgorithm']
-normFiles = { 'HH':get_env()['textureFeatureNormalizationFilePrefix']+'HH.npz',
-              'HV':get_env()['textureFeatureNormalizationFilePrefix']+'HV.npz' }
-svmFile = get_env()['supportVectorMachineFile']
 
 for ifile in ifiles:
     
@@ -35,20 +25,17 @@ for ifile in ifiles:
         continue
     print ID
     s1i = Sentinel1Image(ifile)
-    sigma0, tfs, iceMask = get_map(
-        s1i, mLook, vmin, vmax,l, ws, stp, tfAlg, threads, normFiles, svmFile )
-    '''
-    plt.imsave( os.path.join(odir+ID,ID+'_HH_sigma0.jpg'),
-                sigma0['HH'], cmap='gray' )
-    plt.imsave( os.path.join(odir+ID,ID+'_HV_sigma0.jpg'),
-                sigma0['HV'], cmap='gray' )
-    plt.imsave(os.path.join(odir+ID,ID+'_svm_zones.png'), iceMask)
-    '''
+    sigma0, tfs, pca_zones, svm_zones = get_map(s1i,env)
+
     export_uint8_jpeg( os.path.join(odir+ID,ID+'_HH_sigma0.jpg'), sigma0['HH'] )
     export_uint8_jpeg( os.path.join(odir+ID,ID+'_HV_sigma0.jpg'), sigma0['HV'] )
-    export_uint8_png(os.path.join(odir+ID,ID+'_svm_zones.png'), iceMask)
-    export_PS_proj_GTiff(iceMask,ifile,os.path.join(odir+ID,ID+'_geocoded_svm_zones.tif'))
+    export_uint8_png(os.path.join(odir+ID,ID+'_pca_zones.png'), pca_zones)
+    export_PS_proj_GTiff(pca_zones,ifile,os.path.join(odir+ID,ID+'_geocoded_pca_zones.tif'))
+    export_uint8_png(os.path.join(odir+ID,ID+'_svm_zones.png'), svm_zones)
+    export_PS_proj_GTiff(svm_zones,ifile,os.path.join(odir+ID,ID+'_geocoded_svm_zones.tif'))
 
     for i in range(13):
         export_uint8_png( os.path.join(odir+ID,ID+'_HH_har%02d_norm.jpg' % i), tfs[i] )
         export_uint8_png( os.path.join(odir+ID,ID+'_HV_har%02d_norm.jpg' % i), tfs[i+13] )
+
+    del s1i, sigma0, tfs, pca_zones, svm_zones
