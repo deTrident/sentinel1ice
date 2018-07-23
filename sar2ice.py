@@ -218,24 +218,14 @@ def get_map(s1i,env):
         s1i.add_band(array=(s1i.thermalNoiseRemoval_dev(polarization=pol, windowSize=ws)
                             / np.cos(np.deg2rad(s1i['incidence_angle']))),
                      parameters={'name': 'gamma0_%s_denoised' % pol})
-    skipGCPs = 4          # choose from [1,2,4,5]
-    nGCPs = s1i.vrt.dataset.GetGCPCount()
-    GCPs = s1i.vrt.dataset.GetGCPs()
-    idx = np.arange(0,nGCPs).reshape(nGCPs//21,21)
-    skipGCPsRow = max( [ y for y in range(1,nGCPs//21)
-                     if ((nGCPs//21 -1) % y == 0) and y <= skipGCPs ] )
-    smpGCPs = [ GCPs[i] for i in np.concatenate(idx[::skipGCPsRow,::skipGCPs]) ]
-    GCPProj = s1i.vrt.dataset.GetGCPProjection()
-    dummy = s1i.vrt.dataset.SetGCPs(smpGCPs,GCPProj)
-    s1i.add_band(array=s1i.watermask(tps=True)[1], parameters={'name': 'watermask'})
-    dummy = s1i.vrt.dataset.SetGCPs(GCPs,GCPProj)
 
     print('*** texture feature extraction ...')
+    landmask = maximum_filter(s1i.landmask(skipGCP=4), ws)
     tfs = {'HH':[],'HV':[]}
     for pol in ['HH','HV']:
         grayScaleImage = convert2gray(10*np.log10(s1i['gamma0_%s_denoised' % pol]),
                                       gamma0_min[pol], gamma0_max[pol], l)
-        grayScaleImage[maximum_filter(s1i['watermask']==2,ws)] = 0
+        grayScaleImage[landmask] = 0
         tfs[pol] = get_texture_features(grayScaleImage, ws, stp, threads, tfAlg)
     s1i.resize(factor=1./stp)
     for pol in ['HH','HV']:
