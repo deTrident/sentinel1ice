@@ -16,7 +16,7 @@ def get_env():
     if env['sourceType'] not in ['AARI', 'CIS', 'manual']:
         raise KeyError('"sourceType" must be "AARI" or "CIS" or "manual".')
 
-    env['iceChartDirectory'] = '/Users/jeopar/Development/Python/sentinel1ice/AARI'
+    env['iceChartDirectory'] = '/Volumes/MacOS8TB/Archives/Ice_chart/AARI'
     if env['sourceType']!='manual':
         if not os.path.exists(env['iceChartDirectory']):
             raise IOError('cannot find ice chart directory %s' % env['iceChartDirectory'])

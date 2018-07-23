@@ -243,7 +243,7 @@ def get_map(s1i,env):
             s1i.add_band(array=np.squeeze(tfs[pol][li,:,:]),
                          parameters={'name': 'Haralick_%02d_%s' % (li+1, pol)})
 
-    print('*** applying SVM ...')
+    print('*** applying classifier ...')
     plk = pickle.load(open(classifierFilename, "rb" ))
     if type(plk)==list:
         scaler, clf = plk
