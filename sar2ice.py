@@ -181,6 +181,7 @@ def apply_svm(tfs, svmFile, threads):
     # run parallel processing of all data with SVM
     pool = Pool(threads)
     svmLablesGood = pool.map(clf_predict, tfsGoodChunks)
+    pool.close()
 
     # join results back from the queue and insert into full matrix
     svmLabelsGood = np.hstack(svmLablesGood)
