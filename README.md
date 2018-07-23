@@ -1,5 +1,5 @@
 # sentinel1ice
-## Ice/water classification of Sentinel1 SAR data
+## Sea ice classification of Sentinel-1 EW GRDM data
  * 01_denoise_images.py - apply thermal noise correction, land masking and gray scale conversion.
  * 01_denoise_images_pp.py - parallel processing of 01_denoise_images.py
  * 02_calculate_text_features.py - calculate texture features.
