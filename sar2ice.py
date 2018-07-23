@@ -46,7 +46,7 @@ def haralick_averagedGLCM(subimage):
     return haralick
 
 
-def haralick_AveragedTFs(subimage):
+def haralick_averagedTFs(subimage):
 
     # FOR COMPUTING GLCM,
     # USE SCIKIT-IMAGE PACKAGE WHICH CAN HANDLE MULTIPLE CO-OCCURANCE DISTANCE.
