@@ -1,10 +1,10 @@
 # sentinel1ice
 ## Ice/water classification of Sentinel1 SAR data
- * 00_segmentation.py - preprocess for segmentation based classification.
- * 01_denoise_sigma0.py - apply thermal noise correction.
+ * 01_denoise_images.py - apply thermal noise correction, land masking and gray scale conversion.
+ * 01_denoise_images_pp.py - parallel processing of 01_denoise_images.py
  * 02_calculate_text_features.py - calculate texture features.
- * 03_save_texture_norm_coefs.py - find and save texture feature normalization coefficients
- * 04_normalize_texture_features.py - normalize texture features
- * 05_pca_based_segmentation.py - run PCA and K-means classification. Save PCA and ZONES maps
- * 06_train_svm.py - after manual reclassification train SVM
- * 07_apply_svm.py - apply the trained SVM
+ * 03a_rasterize_ice_chart.py - rasterize vector formatted ice chart into rasterized SAR image geometry.
+ * 03b_segmentation.py - make segmentation image to help manual classification.
+ * 04a_train_classifier_svm.py - train support vector machine based classifier.
+ * 04b_train_classifier_rf.py - train random forest based classifier.
+ * 05_apply_svm.py - apply classifier to the texture features.

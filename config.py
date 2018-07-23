@@ -3,65 +3,60 @@ import os
 def get_env():
 
     env = {}
-    env['inputDirectory'] = '/Data/sat/downloads/sentinel1/'
-    env['outputDirectory'] = '/Data/sat/downloads/sentinel1/tmp/'
-    env['minDate'] = '20170320'
-    env['maxDate'] = '20170405'
-    env['wildcard'] = 'S1?_EW_GRDM_1SDH_20170[3,4]*.zip'
-    env['unzipInput'] = False
-    env['development'] = True
-    env['textureFeatureNormalizationFilePrefix'] = 'normTFs_FramStraitWinter'
-    env['myZonesSuffix'] = '_my_zones.png'
-    env['supportVectorMachineFile'] = 'svm_FramStraitWinter.pickle'
-    env['multiLookFactor'] = 1
-    env['stepSize'] = 25
-    env['subwindowSize'] = 25
-    env['grayLevel'] = 64
-    env['sigma0_max'] = {'HH':  -1.75, 'HV': -14.75}
-    env['sigma0_min'] = {'HH': -24.75, 'HV': -30.25}
-    env['numberOfThreads'] = 4
-    env['textureFeatureAlgorithm'] = 'averagedGLCM'
-    env['skewnessThreshold'] = 0
-    env['textureFeatureNormalization'] = 'boxcox'
-    env['textureFeatureID'] = [0,1,2,3,4,5,6,7,8,9,10,11,12]
-    env['numberOfPrincialComponent'] = 6
-    env['numberOfKmeansCluster'] = 15
-    env['princialComponentID'] = [0,1,2,3,4,5]
-    env['zoneColors'] = [100,250]
-
+    
+    env['inputDirectory'] = '/Volumes/MacOS8TB/Archives/Sentinel-1/FramStrait/'
     if not os.path.exists(env['inputDirectory']):
-            raise IOError('cannot find input directory %s' % env['inputDirectory'])
-    
-    if not os.path.exists(env['outputDirectory']):
-            raise IOError('cannot find output directory %s' % env['outputDirectory'])
+        raise IOError('cannot find input directory %s' % env['inputDirectory'])
 
-    if env['multiLookFactor']%1!=0 or env['multiLookFactor']<=0:
-        raise ValueError('"multiLookFactor" must be positive integer.')
-    
+    env['outputDirectory'] = '/Volumes/MacOS8TB/Process/sentinel1ice/FramStrait/'
+    if not os.path.exists(env['outputDirectory']):
+        os.mkdir(env['outputDirectory'])
+
+    env['sourceType'] = 'AARI'
+    if env['sourceType'] not in ['AARI', 'CIS', 'manual']:
+        raise KeyError('"sourceType" must be "AARI" or "CIS" or "manual".')
+
+    env['iceChartDirectory'] = '/Users/jeopar/Development/Python/sentinel1ice/AARI'
+    if env['sourceType']!='manual':
+        if not os.path.exists(env['iceChartDirectory']):
+            raise IOError('cannot find ice chart directory %s' % env['iceChartDirectory'])
+
+    env['kmeansFilename'] = 'kmeans_FramStrait.pickle'
+
+    env['classifierFilename'] = 'rf_FramStrait.pickle'
+
+    env['minDate'] = None
+
+    env['maxDate'] = None
+
+    env['wildcard'] = '*.zip'
+
+    env['unzipInput'] = False
+    if env['unzipInput'] not in [True, False]:
+        raise ValueError('"unzipInput" must be a boolean.')
+
+    env['gamma0_max'] = {'HH':  +1.0, 'HV':  -8.0}
+
+    env['gamma0_min'] = {'HH': -31.0, 'HV': -32.0}
+
+    env['stepSize'] = 25
     if env['stepSize']%1!=0 or env['stepSize']<=0:
         raise ValueError('"stepSize" must be positive integer.')
-    
+
+    env['subwindowSize'] = 25
     if env['subwindowSize']%1!=0 or env['subwindowSize']<=0:
         raise ValueError('"subwindowSize" must be positive integer.')
-    
+
+    env['grayLevel'] = 64
     if env['grayLevel']%1!=0 or env['grayLevel']<=0:
         raise ValueError('"grayLevel" must be positive integer.')
-    
-    if env['numberOfThreads']%1!=0 or env['numberOfThreads']<=0:
-        raise ValueError('"numberOfThreads" must be positive integer.')
-    
+
+    env['textureFeatureAlgorithm'] = 'averagedGLCM'
     if env['textureFeatureAlgorithm'] not in ['averagedGLCM','averagedTFs']:
         raise KeyError('"textureFeatureAlgorithm" must be "averagedGLCM" or "averagedTFs".')
-    
-    if env['textureFeatureNormalization'] not in ['log','boxcox']:
-        raise KeyError('"textureFeatureNormalization" must be "log" or "boxcox".')
 
-    if ( sum([ID < 13 for ID in env['textureFeatureID'] ])
-         != len(env['textureFeatureID']) ):
-        raise KeyError('"textureFeatureID" contains wrong number.')
-
-    if not all([ ID < env['numberOfPrincialComponent']
-                 for ID in env['princialComponentID'] ]):
-        raise KeyError('"princialComponentID" contains wrong number.')
+    env['numberOfThreads'] = 2
+    if (env['numberOfThreads']<=0) or (env['numberOfThreads']>os.cpu_count()):
+        raise ValueError('"numberOfThreads" must be positive integer (max=%d).' % os.cpu_count())
 
     return env
