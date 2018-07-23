@@ -50,7 +50,7 @@ def run_process(ifile):
                             / np.cos(np.deg2rad(s1i['incidence_angle']))),
                      parameters={'name':'gamma0_%s_denoised' % pol})
     # landmask generation.
-    s1i.add_band(array=maximum_filter(s1i.landmask(skipGCP=4).astype(uint8), ws),
+    s1i.add_band(array=maximum_filter(s1i.landmask(skipGCP=4).astype(np.uint8), ws),
                  parameters={'name':'landmask'})
     # compute histograms and apply gray level scaling
     bin_edges = np.arange(-40.0,+10.1,0.1)
