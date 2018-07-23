@@ -49,47 +49,35 @@ def run_process(ifile):
         s1i.add_band(array=(s1i.thermalNoiseRemoval_dev(polarization=pol, windowSize=ws)
                             / np.cos(np.deg2rad(s1i['incidence_angle']))),
                      parameters={'name':'gamma0_%s_denoised' % pol})
-    # watermask generation. skipping GCPs was introduced to speed up the reprojection process.
-    skipGCPs = 4          # choose from [1,2,4,5]
-    nGCPs = s1i.vrt.dataset.GetGCPCount()
-    GCPs = s1i.vrt.dataset.GetGCPs()
-    idx = np.arange(0,nGCPs).reshape(nGCPs//21,21)
-    skipGCPsRow = max( [ y for y in range(1,nGCPs//21)
-                     if ((nGCPs//21 -1) % y == 0) and y <= skipGCPs ] )
-    smpGCPs = [ GCPs[i] for i in np.concatenate(idx[::skipGCPsRow,::skipGCPs]) ]
-    GCPProj = s1i.vrt.dataset.GetGCPProjection()
-    dummy = s1i.vrt.dataset.SetGCPs(smpGCPs,GCPProj)
-    s1i.add_band(array=maximum_filter(s1i.watermask(tps=True)[1], ws),
-                 parameters={'name':'watermask'})
-    dummy = s1i.vrt.dataset.SetGCPs(GCPs,GCPProj)
+    # landmask generation.
+    s1i.add_band(array=maximum_filter(s1i.landmask(skipGCP=4).astype(uint8), ws),
+                 parameters={'name':'landmask'})
+    # compute histograms and apply gray level scaling
     bin_edges = np.arange(-40.0,+10.1,0.1)
     for pol in ['HH','HV']:
-        # compute histograms for non-land pixels
-        valid = (s1i['watermask']!=2)
+        valid = (s1i['landmask']!=1)
         sigma0dB = 10*np.log10(s1i['sigma0_%s_original' % pol])
         results['original_sigma0_%s_hist' % pol] = np.histogram(
             sigma0dB[np.isfinite(sigma0dB) * valid], bins=bin_edges )
         gamma0dB = 10*np.log10(s1i['gamma0_%s_denoised' % pol])
         results['denoised_gamma0_%s_hist' % pol] = np.histogram(
             gamma0dB[np.isfinite(gamma0dB) * valid], bins=bin_edges )
-        # gray level scaling and land masking
         results['gamma0_%s' % pol] = convert2gray(gamma0dB, gamma0_min[pol], gamma0_max[pol], l)
         results['gamma0_%s' % pol][np.logical_not(valid)] = 0
     # quickview
     s1i.resize(factor=1./stp)
     for pol in ['HH','HV']:
+        valid = (s1i['landmask']!=1)
         s1i.export(ofile.replace('_gamma0.npz','_original_sigma0_%s.tif' % pol),
-                   bands=[s1i.get_band_number('sigma0_%s_original' % pol)],
-                   driver='GTiff')
+                   bands=[s1i.get_band_number('sigma0_%s_original' % pol)], driver='GTiff')
         s1i.export(ofile.replace('_gamma0.npz','_denoised_gamma0_%s.tif' % pol),
-                   bands=[s1i.get_band_number('gamma0_%s_denoised' % pol)],
-                   driver='GTiff')
+                   bands=[s1i.get_band_number('gamma0_%s_denoised' % pol)], driver='GTiff')
         sigma0dB = 10*np.log10(s1i['sigma0_%s_original' % pol])
-        vmin, vmax = np.percentile(sigma0dB[np.isfinite(sigma0dB) * (s1i['watermask']!=2)], (1,99))
+        vmin, vmax = np.percentile(sigma0dB[np.isfinite(sigma0dB) * valid], (1,99))
         plt.imsave( ofile.replace('_gamma0.npz','_original_sigma0_%s.png' % pol),
                     sigma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
         gamma0dB = 10*np.log10(s1i['gamma0_%s_denoised' % pol])
-        vmin, vmax = np.percentile(gamma0dB[np.isfinite(gamma0dB) * (s1i['watermask']!=2)], (1,99))
+        vmin, vmax = np.percentile(gamma0dB[np.isfinite(gamma0dB) * valid], (1,99))
         plt.imsave( ofile.replace('_gamma0.npz','_denoised_gamma0_%s.png' % pol),
                     gamma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
     # incidence angle
