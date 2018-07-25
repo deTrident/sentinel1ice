@@ -1,17 +1,19 @@
 from __future__ import print_function
-import os, sys, glob, mahotas, pickle
-import numpy as np
-import matplotlib;    matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+import os, sys, glob, pickle
+from datetime import datetime
 from multiprocessing import Pool
+from operator import add
+
+import numpy as np
+import mahotas
+import matplotlib.pyplot as plt
 from skimage.feature import greycomatrix
 from scipy.ndimage import maximum_filter
-from operator import add
+
 from nansat import Nansat, Domain
-from datetime import datetime
+from sentinel1denoised.S1_TOPS_GRD_NoiseCorrection import Sentinel1Image
+
 clf = None
-
-
 
 # GLCM computation result from MAHOTAS is different from that of SCIKIT-IMAGE.
 # MAHOTAS considers distance as number of cells in given direction.
@@ -371,3 +373,77 @@ colorDict = { 'AARI':{ 0:(255, 255, 255),    # unclassified
 }
 
 
+def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel, gamma0_min, gamma0_max, quicklook):
+    """ Denoise input file """
+    ifilename = os.path.split(input_file)[1]
+    ID = ifilename.split('.')[0]
+    wdir = os.path.join(outputDirectory, ID)
+    if not os.path.exists(wdir):
+        os.mkdir(wdir)
+    ofile = os.path.join(wdir, ID+'_gamma0.npz')
+    if os.path.exists(ofile):
+        print('Processed data file already exists.')
+
+    if unzipInput:
+        with zipfile.ZipFile(ifile, "r") as z:
+            z.extractall()
+        ifilename = ifilename[:-3]+'SAFE'
+    else:
+        ifilename = input_file
+
+    results = dict()
+    s1i = Sentinel1Image(ifilename)
+    # denoise dual-pol images
+    for pol in ['HH','HV']:
+        print('Denoising for %s polarization image in %s' % (pol, ifilename))
+        s1i.add_band(array=s1i.rawSigma0Map(polarization=pol),
+                     parameters={'name':'sigma0_%s_original' % pol})
+        s1i.add_band(array=(s1i.thermalNoiseRemoval_dev(polarization=pol, windowSize=subwindowSize)
+                            / np.cos(np.deg2rad(s1i['incidence_angle']))),
+                     parameters={'name':'gamma0_%s_denoised' % pol})
+    # landmask generation.
+    s1i.add_band(array=maximum_filter(s1i.landmask(skipGCP=4).astype(np.uint8), subwindowSize),
+                 parameters={'name':'landmask'})
+    # compute histograms and apply gray level scaling
+    bin_edges = np.arange(-40.0,+10.1,0.1)
+    for pol in ['HH','HV']:
+        valid = (s1i['landmask']!=1)
+        sigma0dB = 10*np.log10(s1i['sigma0_%s_original' % pol])
+        results['original_sigma0_%s_hist' % pol] = np.histogram(
+            sigma0dB[np.isfinite(sigma0dB) * valid], bins=bin_edges )
+        gamma0dB = 10*np.log10(s1i['gamma0_%s_denoised' % pol])
+        results['denoised_gamma0_%s_hist' % pol] = np.histogram(
+            gamma0dB[np.isfinite(gamma0dB) * valid], bins=bin_edges )
+        results['gamma0_%s' % pol] = convert2gray(gamma0dB, gamma0_min[pol], gamma0_max[pol], grayLevel)
+        results['gamma0_%s' % pol][np.logical_not(valid)] = 0
+
+    s1i.resize(factor=1./stepSize)
+    # incidence angle
+    results['incidenceAngle'] = s1i['incidence_angle']
+    # save the results as a npz file
+    np.savez_compressed(ofile, **results)
+
+
+    if not quicklook:
+        return
+    # generate quicklook
+    for pol in ['HH','HV']:
+        valid = (s1i['landmask']!=1)
+        s1i.export(ofile.replace('_gamma0.npz','_original_sigma0_%s.tif' % pol),
+                   bands=[s1i.get_band_number('sigma0_%s_original' % pol)], driver='GTiff')
+        s1i.export(ofile.replace('_gamma0.npz','_denoised_gamma0_%s.tif' % pol),
+                   bands=[s1i.get_band_number('gamma0_%s_denoised' % pol)], driver='GTiff')
+        sigma0dB = 10*np.log10(s1i['sigma0_%s_original' % pol])
+        vmin, vmax = np.percentile(sigma0dB[np.isfinite(sigma0dB) * valid], (1,99))
+        plt.imsave( ofile.replace('_gamma0.npz','_original_sigma0_%s.png' % pol),
+                    sigma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
+        gamma0dB = 10*np.log10(s1i['gamma0_%s_denoised' % pol])
+        vmin, vmax = np.percentile(gamma0dB[np.isfinite(gamma0dB) * valid], (1,99))
+        plt.imsave( ofile.replace('_gamma0.npz','_denoised_gamma0_%s.png' % pol),
+                    gamma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
+    # clean up
+    del s1i
+    if os.path.exists(ifilename) and cfg.unzipInput:
+        shutil.rmtree(ifilename)
+
+    return ofile

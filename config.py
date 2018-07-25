@@ -1,62 +1,55 @@
 import os
 
-def get_env():
+inputDirectory = '/Volumes/MacOS8TB/Archives/Sentinel-1/FramStrait/'
+inputDirectory = '/files/sentinel1a/'
 
-    env = {}
-    
-    env['inputDirectory'] = '/Volumes/MacOS8TB/Archives/Sentinel-1/FramStrait/'
-    if not os.path.exists(env['inputDirectory']):
-        raise IOError('cannot find input directory %s' % env['inputDirectory'])
+if not os.path.exists(inputDirectory):
+    raise IOError('cannot find input directory %s' % inputDirectory)
 
-    env['outputDirectory'] = '/Volumes/MacOS8TB/Process/sentinel1ice/FramStrait/'
-    if not os.path.exists(env['outputDirectory']):
-        os.mkdir(env['outputDirectory'])
+outputDirectory = '/Volumes/MacOS8TB/Process/sentinel1ice/FramStrait/'
+outputDirectory = '/files/sentinel1a/denoised/'
+if not os.path.exists(outputDirectory):
+    os.mkdir(outputDirectory)
 
-    env['sourceType'] = 'AARI'
-    if env['sourceType'] not in ['AARI', 'CIS', 'manual']:
-        raise KeyError('"sourceType" must be "AARI" or "CIS" or "manual".')
+#must be in ['AARI', 'CIS', 'manual']
+sourceType = 'AARI'
 
-    env['iceChartDirectory'] = '/Volumes/MacOS8TB/Archives/Ice_chart/AARI'
-    if env['sourceType']!='manual':
-        if not os.path.exists(env['iceChartDirectory']):
-            raise IOError('cannot find ice chart directory %s' % env['iceChartDirectory'])
+iceChartDirectory = '/Volumes/MacOS8TB/Archives/Ice_chart/AARI'
+iceChartDirectory = '/files/sentinel1a/denoised/'
+if sourceType != 'manual':
+    if not os.path.exists(iceChartDirectory):
+        raise IOError('cannot find ice chart directory %s' % iceChartDirectory)
 
-    env['kmeansFilename'] = 'kmeans_FramStrait.pickle'
+kmeansFilename = 'kmeans_FramStrait.pickle'
 
-    env['classifierFilename'] = 'rf_FramStrait.pickle'
+classifierFilename = 'rf_FramStrait.pickle'
 
-    env['minDate'] = None
+# limit file list for denosing by the following parameters:
+minDate = None
+maxDate = None
+wildcard = 'S1A*'
 
-    env['maxDate'] = None
+# generate quicklook of denoised image?
+# must be a boolean
+quicklook = False
 
-    env['wildcard'] = '*.zip'
+# must be a boolean
+unzipInput = False
 
-    env['unzipInput'] = False
-    if env['unzipInput'] not in [True, False]:
-        raise ValueError('"unzipInput" must be a boolean.')
+gamma0_max = {'HH':  +1.0, 'HV':  -8.0}
+gamma0_min = {'HH': -31.0, 'HV': -32.0}
 
-    env['gamma0_max'] = {'HH':  +1.0, 'HV':  -8.0}
+# must be positive integer
+stepSize = 25
 
-    env['gamma0_min'] = {'HH': -31.0, 'HV': -32.0}
+# must be positive integer
+subwindowSize = 25
 
-    env['stepSize'] = 25
-    if env['stepSize']%1!=0 or env['stepSize']<=0:
-        raise ValueError('"stepSize" must be positive integer.')
+# must be positive integer
+grayLevel = 64
 
-    env['subwindowSize'] = 25
-    if env['subwindowSize']%1!=0 or env['subwindowSize']<=0:
-        raise ValueError('"subwindowSize" must be positive integer.')
+# must be in ["averagedGLCM", "averagedTFs"]
+textureFeatureAlgorithm = 'averagedGLCM'
 
-    env['grayLevel'] = 64
-    if env['grayLevel']%1!=0 or env['grayLevel']<=0:
-        raise ValueError('"grayLevel" must be positive integer.')
-
-    env['textureFeatureAlgorithm'] = 'averagedGLCM'
-    if env['textureFeatureAlgorithm'] not in ['averagedGLCM','averagedTFs']:
-        raise KeyError('"textureFeatureAlgorithm" must be "averagedGLCM" or "averagedTFs".')
-
-    env['numberOfThreads'] = 2
-    if (env['numberOfThreads']<=0) or (env['numberOfThreads']>os.cpu_count()):
-        raise ValueError('"numberOfThreads" must be positive integer (max=%d).' % os.cpu_count())
-
-    return env
+# must be o (no multiprocessing) or positive integer < os.cpu_count()
+numberOfThreads = 0
