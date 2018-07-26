@@ -220,7 +220,7 @@ def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads, te
             # save each texture feature in a PNG
             for i, tf in enumerate(tfs[pol]):
                 vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
-                plt.imsave( ofile.replace('_texture_features.npz','_%s_har%02d.png' % (pol, i)),
+                plt.imsave(out_file.replace('_texture_features.npz','_%s_har%02d.png' % (pol, i)),
                             tf, vmin=vmin, vmax=vmax )
     # save the results as a npz file
     np.savez_compressed(out_file, textureFeatures=tfs, incidenceAngle=npz['incidenceAngle'])
@@ -445,6 +445,9 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
 
     results = dict()
     s1i = Sentinel1Image(ifilename)
+    s1i.reproject_gcps()
+    watermask = s1i.landmask(skipGCP=4).astype(np.uint8)
+
     # denoise dual-pol images
     for pol in ['HH','HV']:
         print('Denoising for %s polarization image in %s' % (pol, ifilename))
@@ -454,7 +457,7 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
                             / np.cos(np.deg2rad(s1i['incidence_angle']))),
                      parameters={'name':'gamma0_%s_denoised' % pol})
     # landmask generation.
-    s1i.add_band(array=maximum_filter(s1i.landmask(skipGCP=4).astype(np.uint8), subwindowSize),
+    s1i.add_band(array=maximum_filter(watermask, subwindowSize),
                  parameters={'name':'landmask'})
     # compute histograms and apply gray level scaling
     bin_edges = np.arange(-40.0,+10.1,0.1)
