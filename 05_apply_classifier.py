@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import os, glob, pickle
 import numpy as np
 from nansat import Nansat
-from sar2ice import colorDict
+from sar2ice import save_ice_map
 
 import config as cfg
 

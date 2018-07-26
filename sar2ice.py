@@ -520,7 +520,7 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     clf.n_jobs = threads
 
     # get texture features
-    npz = np.load(ifile)
+    npz = np.load(inp_filename)
     features = np.vstack([npz['textureFeatures'].item()['HH'],
                           npz['textureFeatures'].item()['HV'],
                           npz['incidenceAngle'][np.newaxis,:,:]])
@@ -544,8 +544,8 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     ice_map.export(out_filename, bands=[1], driver='GTiff')
     if quicklook:
         rgb = np.zeros((imgSize[0], imgSize[1], 3), 'uint8')
-        for k in colorDict[cfg.sourceType].keys():
-            rgb[classImage==k,:] = colorDict[cfg.sourceType][k]
-        plt.imsave(ofile.replace('.tif','.png'), rgb)
+        for k in colorDict[source].keys():
+            rgb[classImage==k,:] = colorDict[source][k]
+        plt.imsave(out_filename.replace('.tif','.png'), rgb)
 
     return out_filename
