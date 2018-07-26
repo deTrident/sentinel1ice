@@ -534,11 +534,16 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     classImage = np.ones(np.prod(imgSize)) * np.nan
     classImage[gpi] = result
     classImage = classImage.reshape(imgSize)
+    img_shape = classImage.shape
 
     # open original file to get geometry
     raw_nansat = Nansat(raw_filename)
-    if raw_nansat.shape() != imgSize:
-        raw_nansat.crop(0,0,imgSize[1],imgSize[0])
+    # crop and resize original Nansat to match the ice map
+    raw_shape = raw_nansat.shape()
+    crop = [rshape % ishape for (rshape, ishape) in zip(raw_shape, img_shape)]
+    raw_nansat.crop(0,0,raw_shape[1]-crop[1], raw_shape[0]-crop[0])
+    raw_nansat.resize(height=img_shape[0])
+    raw_nansat.reproject_gcps()
 
     # create new Nansat object and add ice map
     ice_map = Nansat.from_domain(domain=raw_nansat, array=classImage)
@@ -546,9 +551,14 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     ice_map.set_metadata('entry_title', 'S1_SAR_ICE_MAP')
     ice_map.export(out_filename, bands=[1], driver='GTiff')
     if quicklook:
-        rgb = np.zeros((imgSize[0], imgSize[1], 3), 'uint8')
-        for k in colorDict[source].keys():
-            rgb[classImage==k,:] = colorDict[source][k]
+        rgb = colorcode_array(classImage, source)
         plt.imsave(out_filename.replace('.tif','.png'), rgb)
 
     return out_filename
+
+def colorcode_array(inp_array, source):
+    rgb = np.zeros((inp_array.shape[0], inp_array.shape[1], 3), 'uint8')
+    for k in colorDict[source].keys():
+        rgb[inp_array==k,:] = colorDict[source][k]
+
+    return rgb
