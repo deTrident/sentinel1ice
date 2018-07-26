@@ -29,11 +29,10 @@ minDate = None
 maxDate = None
 wildcard = 'S1A*'
 
-# generate quicklook of denoised image?
-# must be a boolean
+# boolean, generate quicklook of denoised image?
 quicklook = False
 
-# must be a boolean
+# boolean, unzip input files and keep them?
 unzipInput = False
 
 gamma0_max = {'HH':  +1.0, 'HV':  -8.0}
@@ -53,3 +52,6 @@ textureFeatureAlgorithm = 'averagedGLCM'
 
 # must be o (no multiprocessing) or positive integer < os.cpu_count()
 numberOfThreads = 6
+
+# boolean, force processing?
+force = True

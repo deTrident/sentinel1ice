@@ -176,6 +176,57 @@ def get_texture_features(iarray, ws, stp, threads, alg):
     return np.swapaxes(harImageAnis.T, 1, 2)
 
 
+def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads, textureFeatureAlgorithm, quicklook, force=False):
+    """ Wrapper around get_texture_features. Load input file, calculate TF, save output
+    Parameters
+    ----------
+        inp_file : str
+            name of inputfile
+        subwindowSize : int
+            size of subwindow
+        stepSize : int
+            step of sub-window floating
+        numberOfThreads : int
+            number of parallel processes
+        textureFeatureAlgorithm : str
+            'averagedGLCM' : compute averaged texture from multi-coocurrence
+                             distance by taking mean at Haralick feature level
+            'averagedTFs' : compute averaged texture from multi-coocurrence
+                            distance by taking mean at GLCM level
+        quicklook : bool
+            generate quicklooks?
+
+    Returns
+    -------
+        harImageAnis : ndarray
+            [13 x ROWS x COLS] array with texture features descriptors
+            13 - nuber of texture features
+            ROWS = rows of input image / stp
+            COLS = rows of input image / stp
+    """
+
+    out_file = inp_file.replace('_gamma0','_texture_features')
+    if os.path.exists(out_file) and not force:
+        print('File %s with texture features already exists.' % out_file)
+        return out_file
+
+    npz = np.load(inp_file)
+    tfs = {}
+    for pol in ['HH', 'HV']:
+        print('Compute texture %s features from %s' % (pol, inp_file))
+        # get texture features
+        tfs[pol] = get_texture_features(npz['gamma0_%s' % pol], subwindowSize, stepSize, numberOfThreads, textureFeatureAlgorithm)
+        if quicklook:
+            # save each texture feature in a PNG
+            for i, tf in enumerate(tfs[pol]):
+                vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
+                plt.imsave( ofile.replace('_texture_features.npz','_%s_har%02d.png' % (pol, i)),
+                            tf, vmin=vmin, vmax=vmax )
+    # save the results as a npz file
+    np.savez_compressed(out_file, textureFeatures=tfs, incidenceAngle=npz['incidenceAngle'])
+    return out_file
+
+
 def get_map(s1i,env):
     '''Get raster map with classification results
 
