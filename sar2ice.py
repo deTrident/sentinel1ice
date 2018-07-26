@@ -497,7 +497,7 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
                         gamma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
         # clean up
         del s1i
-        if os.path.exists(ifilename) and cfg.unzipInput:
+        if os.path.exists(ifilename) and unzipInput:
             shutil.rmtree(ifilename)
 
     return ofile
