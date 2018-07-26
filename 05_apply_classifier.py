@@ -6,15 +6,11 @@ import os, glob, pickle
 import numpy as np
 from nansat import Nansat
 from sar2ice import colorDict
-from config import get_env
 
-# read configuration
-env = get_env()
-classifierFilename = env['classifierFilename']
-sourceType = env['sourceType']
-threads = env['numberOfThreads']
+import config as cfg
+
 # import classifier
-plk = pickle.load(open(classifierFilename, "rb" ))
+plk = pickle.load(open(cfg.classifierFilename, "rb" ))
 if type(plk)==list:
     scaler, clf = plk
 else:
@@ -23,10 +19,10 @@ else:
             return(x)
     scaler = dummy_class()
     clf = plk
-clf.n_jobs = threads
+clf.n_jobs = cfg.numberOfThreads
+
 # listup texture feature files
-idir = get_env()['outputDirectory']
-ifiles = sorted(glob.glob(idir + '*/S1?_EW_GRDM_1SDH*_texture_features.npz'))
+ifiles = sorted(glob.glob(cfg.outputDirectory + '*/S1?_EW_GRDM_1SDH*_texture_features.npz'))
 # process each file
 for ifile in ifiles:
     ofile = ifile.replace('_texture_features.npz', '_classified.tif')
@@ -45,12 +41,16 @@ for ifile in ifiles:
     classImage = np.ones(np.prod(imgSize)) * np.nan
     classImage[gpi] = result
     classImage = classImage.reshape(imgSize)
-    nansatObjGamma0 = Nansat(ifile.replace('_texture_features.npz','_denoised_gamma0_HH.tif'))
+    nansat_filename = ifile.replace('_texture_features.npz','_denoised_gamma0_HH.tif')
+    if not os.path.exists(nansat_filename):
+        nansat_filename = glob.glob(cfg.inputDirectory + os.path.basename(ifile).replace('_texture_features.npz', '*'))[0]
+    nansatObjGamma0 = Nansat(nansat_filename)
     if nansatObjGamma0.shape() != imgSize:
         nansatObjGamma0.crop(0,0,imgSize[1],imgSize[0])
-    nansatObjClass = Nansat(array=classImage, domain=nansatObjGamma0)
+
+    nansatObjClass = Nansat.from_domain(domain=nansatObjGamma0, array=classImage)
     nansatObjClass.export(ofile, bands=[1], driver='GTiff')
     rgb = np.zeros((imgSize[0], imgSize[1], 3), 'uint8')
-    for k in colorDict[sourceType].keys():
-        rgb[classImage==k,:] = colorDict[sourceType][k]
+    for k in colorDict[cfg.sourceType].keys():
+        rgb[classImage==k,:] = colorDict[cfg.sourceType][k]
     plt.imsave(ofile.replace('.tif','.png'), rgb)

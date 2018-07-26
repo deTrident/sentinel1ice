@@ -22,7 +22,7 @@ if sourceType != 'manual':
 
 kmeansFilename = 'kmeans_FramStrait.pickle'
 
-classifierFilename = 'rf_FramStrait.pickle'
+classifierFilename = '/Data/sat/downloads/sentinel1/rf_FramStrait_AARI.pickle'
 
 # limit file list for denosing by the following parameters:
 minDate = None
