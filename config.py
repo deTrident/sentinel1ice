@@ -52,4 +52,4 @@ grayLevel = 64
 textureFeatureAlgorithm = 'averagedGLCM'
 
 # must be o (no multiprocessing) or positive integer < os.cpu_count()
-numberOfThreads = 0
+numberOfThreads = 6

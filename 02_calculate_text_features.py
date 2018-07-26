@@ -5,18 +5,10 @@ import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
 from sar2ice import get_texture_features
-from config import get_env
+import config as cfg
 
-# read configuration
-env = get_env()
-# set up parameters for Haralick texture features computation
-stp = env['stepSize']    # step size
-ws  = env['subwindowSize']    # 1km pixel spacing (40m * 25 = 1000m)
-threads = env['numberOfThreads']
-alg = env['textureFeatureAlgorithm']
-idir = env['outputDirectory']
 # listup denoised image files
-ifiles = sorted(glob.glob(idir + '*/S1?_EW_GRDM_1SDH*_gamma0.npz'))
+ifiles = sorted(glob.glob(cfg.outputDirectory + '*/S1?_EW_GRDM_1SDH*_gamma0.npz'))
 # process each file
 for ifile in ifiles:
     ifilename = os.path.split(ifile)[1]
@@ -30,7 +22,7 @@ for ifile in ifiles:
     for pol in ['HH', 'HV']:
         print('Computing texture features for %s polarization.' % pol)
         # get texture features
-        tfs[pol] = get_texture_features(npz['gamma0_%s' % pol], ws, stp, threads, alg)
+        tfs[pol] = get_texture_features(npz['gamma0_%s' % pol], cfg.subwindowSize, cfg.stepSize, cfg.numberOfThreads, cfg.textureFeatureAlgorithm)
         # save each texture feature in a PNG
         for i, tf in enumerate(tfs[pol]):
             vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
