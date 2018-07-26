@@ -424,7 +424,7 @@ colorDict = { 'AARI':{ 0:(255, 255, 255),    # unclassified
 }
 
 
-def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel, gamma0_min, gamma0_max, quicklook):
+def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel, gamma0_min, gamma0_max, quicklook, force=False):
     """ Denoise input file """
     ifilename = os.path.split(input_file)[1]
     ID = ifilename.split('.')[0]
@@ -432,8 +432,9 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
     if not os.path.exists(wdir):
         os.mkdir(wdir)
     ofile = os.path.join(wdir, ID+'_gamma0.npz')
-    if os.path.exists(ofile):
+    if os.path.exists(ofile) and not force:
         print('Processed data file already exists.')
+        return ofile
 
     if unzipInput:
         with zipfile.ZipFile(ifile, "r") as z:
@@ -475,26 +476,25 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
     np.savez_compressed(ofile, **results)
 
 
-    if not quicklook:
-        return
-    # generate quicklook
-    for pol in ['HH','HV']:
-        valid = (s1i['landmask']!=1)
-        s1i.export(ofile.replace('_gamma0.npz','_original_sigma0_%s.tif' % pol),
-                   bands=[s1i.get_band_number('sigma0_%s_original' % pol)], driver='GTiff')
-        s1i.export(ofile.replace('_gamma0.npz','_denoised_gamma0_%s.tif' % pol),
-                   bands=[s1i.get_band_number('gamma0_%s_denoised' % pol)], driver='GTiff')
-        sigma0dB = 10*np.log10(s1i['sigma0_%s_original' % pol])
-        vmin, vmax = np.percentile(sigma0dB[np.isfinite(sigma0dB) * valid], (1,99))
-        plt.imsave( ofile.replace('_gamma0.npz','_original_sigma0_%s.png' % pol),
-                    sigma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
-        gamma0dB = 10*np.log10(s1i['gamma0_%s_denoised' % pol])
-        vmin, vmax = np.percentile(gamma0dB[np.isfinite(gamma0dB) * valid], (1,99))
-        plt.imsave( ofile.replace('_gamma0.npz','_denoised_gamma0_%s.png' % pol),
-                    gamma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
-    # clean up
-    del s1i
-    if os.path.exists(ifilename) and cfg.unzipInput:
-        shutil.rmtree(ifilename)
+    if quicklook:
+        # generate quicklook
+        for pol in ['HH','HV']:
+            valid = (s1i['landmask']!=1)
+            s1i.export(ofile.replace('_gamma0.npz','_original_sigma0_%s.tif' % pol),
+                       bands=[s1i.get_band_number('sigma0_%s_original' % pol)], driver='GTiff')
+            s1i.export(ofile.replace('_gamma0.npz','_denoised_gamma0_%s.tif' % pol),
+                       bands=[s1i.get_band_number('gamma0_%s_denoised' % pol)], driver='GTiff')
+            sigma0dB = 10*np.log10(s1i['sigma0_%s_original' % pol])
+            vmin, vmax = np.percentile(sigma0dB[np.isfinite(sigma0dB) * valid], (1,99))
+            plt.imsave( ofile.replace('_gamma0.npz','_original_sigma0_%s.png' % pol),
+                        sigma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
+            gamma0dB = 10*np.log10(s1i['gamma0_%s_denoised' % pol])
+            vmin, vmax = np.percentile(gamma0dB[np.isfinite(gamma0dB) * valid], (1,99))
+            plt.imsave( ofile.replace('_gamma0.npz','_denoised_gamma0_%s.png' % pol),
+                        gamma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
+        # clean up
+        del s1i
+        if os.path.exists(ifilename) and cfg.unzipInput:
+            shutil.rmtree(ifilename)
 
     return ofile
