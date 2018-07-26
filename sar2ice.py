@@ -498,3 +498,54 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
             shutil.rmtree(ifilename)
 
     return ofile
+
+def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, source, quicklook=False, force=False):
+    """ Load texture features, apply classifier and save ice map """
+    # get filenames
+    out_filename = inp_filename.replace('_texture_features.npz', '_classified.tif')
+    if os.path.exists(out_filename) and not force:
+        print('Processed data file already exists.')
+        return out_filename
+
+    # import classifier
+    plk = pickle.load(open(classifier_filename, "rb" ))
+    if type(plk)==list:
+        scaler, clf = plk
+    else:
+        class dummy_class(object):
+            def transform(self, x):
+                return(x)
+        scaler = dummy_class()
+        clf = plk
+    clf.n_jobs = threads
+
+    # get texture features
+    npz = np.load(ifile)
+    features = np.vstack([npz['textureFeatures'].item()['HH'],
+                          npz['textureFeatures'].item()['HV'],
+                          npz['incidenceAngle'][np.newaxis,:,:]])
+    imgSize = features.shape[1:]
+    features = features.reshape((27,np.prod(imgSize))).T
+    gpi = np.isfinite(features.sum(axis=1))
+    result = clf.predict(scaler.transform(features[gpi,:]))
+    classImage = np.ones(np.prod(imgSize)) * np.nan
+    classImage[gpi] = result
+    classImage = classImage.reshape(imgSize)
+
+    # open original file to get geometry
+    raw_nansat = Nansat(raw_filename)
+    if raw_nansat.shape() != imgSize:
+        raw_nansat.crop(0,0,imgSize[1],imgSize[0])
+
+    # create new Nansat object and add ice map
+    ice_map = Nansat.from_domain(domain=raw_nansat, array=classImage)
+    ice_map.set_metadata(raw_nansat.get_metadata())
+    ice_map.set_metadata('entry_title', 'S1_SAR_ICE_MAP')
+    ice_map.export(out_filename, bands=[1], driver='GTiff')
+    if quicklook:
+        rgb = np.zeros((imgSize[0], imgSize[1], 3), 'uint8')
+        for k in colorDict[cfg.sourceType].keys():
+            rgb[classImage==k,:] = colorDict[cfg.sourceType][k]
+        plt.imsave(ofile.replace('.tif','.png'), rgb)
+
+    return out_filename
