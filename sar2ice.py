@@ -435,7 +435,7 @@ def julian_date(YYYYMMDDTHHMMSS):
     return dayFraction + day
 
 
-def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel, gamma0_min, gamma0_max, quicklook, force=False):
+def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel, gamma0_min, gamma0_max, quicklook, force=False, get_landmask=False):
     """ Denoise input file """
     ifilename = os.path.split(input_file)[1]
     ID = ifilename.split('.')[0]
@@ -444,7 +444,7 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
         os.mkdir(wdir)
     ofile = os.path.join(wdir, ID+'_gamma0.npz')
     if os.path.exists(ofile) and not force:
-        print('Processed data file already exists.')
+        print('Processed file %s already exists.' % ofile)
         return ofile
 
     if unzipInput:
@@ -457,7 +457,10 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
     results = dict()
     s1i = Sentinel1Image(ifilename)
     s1i.reproject_gcps()
-    watermask = s1i.landmask(skipGCP=4).astype(np.uint8)
+    if get_landmask:
+        landmask = s1i.landmask(skipGCP=1).astype(np.uint8)
+    else:
+        landmask = np.zeros(s1i.shape())
 
     # denoise dual-pol images
     for pol in ['HH','HV']:
@@ -468,7 +471,7 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
                             / np.cos(np.deg2rad(s1i['incidence_angle']))),
                      parameters={'name':'gamma0_%s_denoised' % pol})
     # landmask generation.
-    s1i.add_band(array=maximum_filter(watermask, subwindowSize),
+    s1i.add_band(array=maximum_filter(landmask, subwindowSize),
                  parameters={'name':'landmask'})
     # compute histograms and apply gray level scaling
     bin_edges = np.arange(-40.0,+10.1,0.1)
@@ -518,7 +521,7 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     # get filenames
     out_filename = inp_filename.replace('_texture_features.npz', '_classified.tif')
     if os.path.exists(out_filename) and not force:
-        print('Processed data file already exists.')
+        print('Processed file %s already exists.' % out_filename)
         return out_filename
 
     # import classifier
