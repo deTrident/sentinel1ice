@@ -15,6 +15,38 @@ from sentinel1denoised.S1_TOPS_GRD_NoiseCorrection import Sentinel1Image
 
 clf = None
 
+colorDict = { 'AARI':{ 0:(255, 255, 255),    # unclassified
+                       1:( 39, 189, 255),    # open water
+                      -9:( 39, 189, 255),    # open water
+                      82:(  0,  79, 255),    # nilas
+                      83:(244,   0, 255),    # young ice
+                      86:( 43, 191, 141),    # first year ice
+                      95:(122,   0,   0),    # old ice
+                      99:(150, 150, 150),    # fast ice
+                      92:( 32, 135,   0),    # ice concentration 10-60 % (used only in this script)
+                      94:(248, 101,   0), }, # ice concentration 70-100 % (used only in this script)
+               'CIS':{ 0:(255, 255, 255),    # unclassified
+                      81:(107,  34, 207),    # Gray ice
+                      84:(107,  34, 207),    # Gray ice
+                      85:(206,  52, 238),    # Gray-white ice
+                      87:(145, 207,   0),    # Thin first year ice
+                      91:( 47, 198,   0),    # Medium first year ice
+                      93:( 25, 106,   0),    # Thick first year ice
+                      95:(161,  77,  35),    # Old ice
+                      99:(134, 194, 255), }  # open water
+}
+"""
+00 ffffff
+-9 27bdff
+82 004fff
+83 f400ff
+86 2bbf8d
+95 7a0000
+99 969696
+92 208700
+94 f86500
+"""
+
 # GLCM computation result from MAHOTAS is different from that of SCIKIT-IMAGE.
 # MAHOTAS considers distance as number of cells in given direction.
 # SCKIT-IMAGE considers distance as euclidian distance, and take values form
@@ -401,27 +433,6 @@ def julian_date(YYYYMMDDTHHMMSS):
             + int(YYYYMMDDTHHMMSS[6:8])
             - 1524.5 )
     return dayFraction + day
-
-
-colorDict = { 'AARI':{ 0:(255, 255, 255),    # unclassified
-                      -9:( 39, 189, 255),    # open water
-                      82:(  0,  79, 255),    # nilas
-                      83:(244,   0, 255),    # young ice
-                      86:( 43, 191, 141),    # first year ice
-                      95:(122,   0,   0),    # old ice
-                      99:(150, 150, 150),    # fast ice
-                      92:( 32, 135,   0),    # ice concentration 10-60 % (used only in this script)
-                      94:(248, 101,   0), }, # ice concentration 70-100 % (used only in this script)
-               'CIS':{ 0:(255, 255, 255),    # unclassified
-                      81:(107,  34, 207),    # Gray ice
-                      84:(107,  34, 207),    # Gray ice
-                      85:(206,  52, 238),    # Gray-white ice
-                      87:(145, 207,   0),    # Thin first year ice
-                      91:( 47, 198,   0),    # Medium first year ice
-                      93:( 25, 106,   0),    # Thick first year ice
-                      95:(161,  77,  35),    # Old ice
-                      99:(134, 194, 255), }  # open water
-}
 
 
 def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel, gamma0_min, gamma0_max, quicklook, force=False):
