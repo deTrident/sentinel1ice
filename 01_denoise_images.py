@@ -24,7 +24,7 @@ def _init_pool(*args):
 # find input files
 ifiles = sorted(glob.glob(cfg.inputDirectory + cfg.wildcard), reverse=True)
 if (cfg.minDate!=None) and (cfg.maxDate!=None):
-    ifiles = [ifile for ifile in ifiles if minDate <= os.path.split(ifile)[-1][17:25] <= maxDate]
+    ifiles = [ifile for ifile in ifiles if cfg.minDate <= os.path.split(ifile)[-1][17:25] <= cfg.maxDate]
 
 if cfg.numberOfThreads == 0:
     # run denosing without threads

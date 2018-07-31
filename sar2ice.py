@@ -15,37 +15,28 @@ from sentinel1denoised.S1_TOPS_GRD_NoiseCorrection import Sentinel1Image
 
 clf = None
 
-colorDict = { 'AARI':{ 0:(255, 255, 255),    # unclassified
-                       1:( 39, 189, 255),    # open water
-                      -9:( 39, 189, 255),    # open water
-                      82:(  0,  79, 255),    # nilas
-                      83:(244,   0, 255),    # young ice
-                      86:( 43, 191, 141),    # first year ice
-                      95:(122,   0,   0),    # old ice
-                      99:(150, 150, 150),    # fast ice
-                      92:( 32, 135,   0),    # ice concentration 10-60 % (used only in this script)
-                      94:(248, 101,   0), }, # ice concentration 70-100 % (used only in this script)
-               'CIS':{ 0:(255, 255, 255),    # unclassified
-                      81:(107,  34, 207),    # Gray ice
-                      84:(107,  34, 207),    # Gray ice
-                      85:(206,  52, 238),    # Gray-white ice
-                      87:(145, 207,   0),    # Thin first year ice
-                      91:( 47, 198,   0),    # Medium first year ice
-                      93:( 25, 106,   0),    # Thick first year ice
-                      95:(161,  77,  35),    # Old ice
-                      99:(134, 194, 255), }  # open water
+colorDict = {   0:(  0, 100, 255),    # Ice free
+                1:(150, 200, 255),    # <1/10 ice of unspecified SoD (open water)
+               81:(240, 210, 250),    # New ice
+               82:(255, 138, 255),    # Nilas, Ice Rind
+               83:(170,  40, 240),    # Young ice
+               84:(135,  60, 215),    # Grey ice
+               85:(220,  80, 235),    # Grey-white ice
+               86:(255, 255,   0),    # First-year ice (FY)
+               87:(155, 210,   0),    # FY thin ice (white ice)
+               88:(215, 250, 130),    # FY thin ice (white ice) first stage
+               89:(175, 250,   0),    # FY thin ice (white ice) second stage
+               91:(  0, 200,  20),    # FY medium ice
+               93:(  0, 120,   0),    # FY thick ice
+               95:(180, 100,  50),    # Old ice
+               96:(255, 120,  10),    # Second-year ice
+               97:(200,   0,   0),    # Multi-year ice
+               98:(210, 210, 210),    # Glacier ice
+               99:(255, 255, 255),    # Ice of undefined SoD
+              107:(150, 150, 150),    # Fast ice of unspecified SoD
+              108:(255,   0,   0),    # Iceberg
 }
-"""
-00 ffffff
--9 27bdff
-82 004fff
-83 f400ff
-86 2bbf8d
-95 7a0000
-99 969696
-92 208700
-94 f86500
-"""
+
 
 # GLCM computation result from MAHOTAS is different from that of SCIKIT-IMAGE.
 # MAHOTAS considers distance as number of cells in given direction.
@@ -519,7 +510,7 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
 def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, source, quicklook=False, force=False):
     """ Load texture features, apply classifier and save ice map """
     # get filenames
-    out_filename = inp_filename.replace('_texture_features.npz', '_classified.tif')
+    out_filename = inp_filename.replace('_texture_features.npz', '_classified_%s.tif' % source)
     if os.path.exists(out_filename) and not force:
         print('Processed file %s already exists.' % out_filename)
         return out_filename
@@ -565,14 +556,14 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     ice_map.set_metadata('entry_title', 'S1_SAR_ICE_MAP')
     ice_map.export(out_filename, bands=[1], driver='GTiff')
     if quicklook:
-        rgb = colorcode_array(classImage, source)
+        rgb = colorcode_array(classImage)
         plt.imsave(out_filename.replace('.tif','.png'), rgb)
 
     return out_filename
 
-def colorcode_array(inp_array, source):
+def colorcode_array(inp_array):
     rgb = np.zeros((inp_array.shape[0], inp_array.shape[1], 3), 'uint8')
-    for k in colorDict[source].keys():
-        rgb[inp_array==k,:] = colorDict[source][k]
+    for k in colorDict.keys():
+        rgb[inp_array==k,:] = colorDict[k]
 
     return rgb

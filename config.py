@@ -11,7 +11,7 @@ outputDirectory = '/files/sentinel1a/denoised/'
 if not os.path.exists(outputDirectory):
     os.mkdir(outputDirectory)
 
-#must be in ['AARI', 'CIS', 'manual']
+#must be in ['AARI', 'NIC', 'manual']
 sourceType = 'AARI'
 
 iceChartDirectory = '/Volumes/MacOS8TB/Archives/Ice_chart/AARI'

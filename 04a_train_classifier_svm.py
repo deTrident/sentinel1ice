@@ -5,23 +5,18 @@ import numpy as np
 from sklearn.model_selection import GridSearchCV
 from sklearn import svm, preprocessing
 from sklearn.ensemble import BaggingClassifier
-from config import get_env
+import config as cfg
 
 # read configuration
-env = get_env()
-srcType = env['sourceType']
-if srcType=='manual':
+if cfg.sourceType=='manual':
     ext = '_manual_classification.tif'
 else:
-    ext = '_reprojected_ice_chart.tif'
-idir = env['outputDirectory']
-classifierFilename = env['classifierFilename']
-threads = env['numberOfThreads']
+    ext = '_reprojected_%s.tif' % cfg.sourceType
 # set up parameters for training
 trainProportion = 0.6
-samplesPerEnsembleClassifier = int((10000/env['stepSize'])**2)
+samplesPerEnsembleClassifier = int((10000/cfg.stepSize)**2)
 # listup reprojected ice charts
-ifiles = sorted(glob.glob(idir+'*/*%s' % ext))
+ifiles = sorted(glob.glob(cfg.outputDirectory+'*/*%s' % ext))
 # import and stack
 features_all = []
 iceCodes_all = []
@@ -37,13 +32,9 @@ for li, ifile in enumerate(ifiles):
     iceCodes_all.append(iceCode.reshape(np.prod(iceCode.shape)))
 features_all = np.hstack(features_all).T
 iceCodes_all = np.hstack(iceCodes_all).T
-if srcType=='AARI':
-    # exclude some ice codes (0:unclassified, 99:fast ice, 94,96:summer)
-    gpi = ( np.isfinite(features_all.sum(axis=1)) * (iceCodes_all != 0)
-            * (iceCodes_all != 99) * (iceCodes_all != 92) * (iceCodes_all != 94) )
-elif srcType=='CIS':
-    # exclude some ice codes (0:unclassified)
-    gpi = ( np.isfinite(features_all.sum(axis=1)) * (iceCodes_all != 0) )
+# exclude some ice codes (98:glacier, 99:undefined, 107:fast ice, 108:iceberg)
+gpi = ( np.isfinite(features_all.sum(axis=1)) * (iceCodes_all != 98) * (iceCodes_all != 99)
+        * (iceCodes_all != 107) * (iceCodes_all != 108) )
 features_all = features_all[gpi]
 iceCodes_all = iceCodes_all[gpi]
 ### divide data into train/test set
@@ -67,18 +58,18 @@ tuneFeatures = tuneScaler.transform(features_all[tuneIndices])
 tuneZones = iceCodes_all[tuneIndices]
 grid_lin = GridSearchCV(svm.LinearSVC(),
                         param_grid={'C':np.logspace(-1,1,3,base=10).tolist()},
-                        n_jobs=threads, verbose=10)
+                        n_jobs=cfg.numberOfThreads, verbose=10)
 grid_lin.fit(tuneFeatures, tuneZones)
 grid_rbf = GridSearchCV(svm.SVC(kernel='rbf'),
                         param_grid={'gamma':np.logspace(-1,1,3,base=10).tolist(),
                                     'C':np.logspace(-1,1,3,base=10).tolist()},
-                        n_jobs=threads, verbose=10)
+                        n_jobs=cfg.numberOfThreads, verbose=10)
 grid_rbf.fit(tuneFeatures, tuneZones)
 if grid_lin.best_score_ >= grid_rbf.best_score_:
     estimator = svm.LinearSVC(**grid_lin.best_params_)
 else:
     physical_memory_in_MB = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024.**2)
-    cache_size = np.median([200, 1024, physical_memory_in_MB // threads])
+    cache_size = np.median([200, 1024, physical_memory_in_MB // cfg.numberOfThreads])
     estimator = svm.SVC(kernel='rbf', **grid_rbf.best_params_, cache_size=cache_size)
 ### train classifier
 print('*** Training classifier: %d samples.' % len(trainIndices))
@@ -87,10 +78,10 @@ trainFeatures = scaler.transform(features_all[trainIndices,:])
 trainZones = iceCodes_all[trainIndices]
 n_estimators = np.max([1, len(trainIndices) // samplesPerEnsembleClassifier])
 max_samples = 1./n_estimators
-clf = BaggingClassifier(base_estimator=estimator, n_jobs=threads, verbose=10,
+clf = BaggingClassifier(base_estimator=estimator, n_jobs=cfg.numberOfThreads, verbose=10,
                         n_estimators=n_estimators, max_samples=max_samples)
 clf.fit(trainFeatures, trainZones)
-pickle.dump([scaler, clf], open(classifierFilename, "wb" ))
+pickle.dump([scaler, clf], open(cfg.classifierFilename, "wb" ))
 ### test classifier
 print('*** Testing classifier: %d samples.' % len(testIndices))
 testFeatures = scaler.transform(features_all[testIndices,:])

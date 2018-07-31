@@ -4,15 +4,13 @@ import matplotlib;    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os, glob
 import numpy as np
-from config import get_env
-
-idir = get_env()['outputDirectory']
+import config as cfg
 
 low_edge = 0.1  # threshold for clipping extreme values
 high_edge = 0.1  # threshold for clipping extreme values
 
 # find input files
-ifiles = sorted(glob.glob(idir + '*/S1?_EW_GRDM_1SDH*_gamma0.npz'))
+ifiles = sorted(glob.glob(cfg.outputDirectory + '*/S1?_EW_GRDM_1SDH*_gamma0.npz'))
 
 
 for pol in ['HH','HV']:

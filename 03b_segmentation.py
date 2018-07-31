@@ -8,18 +8,14 @@ from sklearn import preprocessing
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from nansat import Nansat
-from config import get_env
+import config as cfg
 
 # set up parameters for clustering
 n_components = 7
 n_clusters = 8
 # read configuration
-env = get_env()
-idir = env['outputDirectory']
-threads = env['numberOfThreads']
-kmeansFilename = env['kmeansFilename']
 # listup texture feature files
-ifiles = sorted(glob.glob(idir + '*/*_texture_features.npz'))
+ifiles = sorted(glob.glob(cfg.outputDirectory + '*/*_texture_features.npz'))
 #ifiles = [fn for fn in ifiles
 #          if os.path.exists(fn.replace('_texture_features.npz','_reprojected_ice_chart.tif'))]
 # import and stack
@@ -38,8 +34,8 @@ features_all = features_all[np.isfinite(features_all.sum(axis=1))]
 print('*** Optimizing PCA and Kmeans')
 scaler = preprocessing.QuantileTransformer(output_distribution='normal').fit(features_all)
 pca = PCA(n_components=n_components).fit(scaler.transform(features_all))
-kmeans = KMeans(n_clusters=n_clusters, n_jobs=threads).fit(pca.transform(scaler.transform(features_all)))
-pickle.dump([scaler, pca, kmeans], open(kmeansFilename, "wb" ))
+kmeans = KMeans(n_clusters=n_clusters, n_jobs=cfg.numberOfThreads).fit(pca.transform(scaler.transform(features_all)))
+pickle.dump([scaler, pca, kmeans], open(cfg.kmeansFilename, "wb" ))
 # apply clustering
 print('*** Exporting files to:')
 for li, ifile in enumerate(ifiles):
