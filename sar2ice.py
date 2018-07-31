@@ -35,6 +35,7 @@ colorDict = {   0:(  0, 100, 255),    # Ice free
                99:(255, 255, 255),    # Ice of undefined SoD
               107:(150, 150, 150),    # Fast ice of unspecified SoD
               108:(255,   0,   0),    # Iceberg
+              255:(  0,   0,   0),    # void cell in texture features (land, scene border)
 }
 
 
@@ -536,7 +537,7 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     features = features.reshape((27,np.prod(imgSize))).T
     gpi = np.isfinite(features.sum(axis=1))
     result = clf.predict(scaler.transform(features[gpi,:]))
-    classImage = np.ones(np.prod(imgSize)) * np.nan
+    classImage = np.ones(np.prod(imgSize)) * 255
     classImage[gpi] = result
     classImage = classImage.reshape(imgSize)
     img_shape = classImage.shape
