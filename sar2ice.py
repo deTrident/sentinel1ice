@@ -9,6 +9,7 @@ import mahotas
 import matplotlib.pyplot as plt
 from skimage.feature import greycomatrix
 from scipy.ndimage import maximum_filter
+import gdal
 
 from nansat import Nansat, Domain
 from sentinel1denoised.S1_TOPS_GRD_NoiseCorrection import Sentinel1Image
@@ -552,10 +553,12 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     raw_nansat.reproject_gcps()
 
     # create new Nansat object and add ice map
-    ice_map = Nansat.from_domain(domain=raw_nansat, array=classImage)
+    ice_map = Nansat.from_domain(domain=raw_nansat, array=classImage.astype(np.uint8))
     ice_map.set_metadata(raw_nansat.get_metadata())
     ice_map.set_metadata('entry_title', 'S1_SAR_ICE_MAP')
+    ice_map = add_colortable(ice_map)
     ice_map.export(out_filename, bands=[1], driver='GTiff')
+
     if quicklook:
         rgb = colorcode_array(classImage)
         plt.imsave(out_filename.replace('.tif','.png'), rgb)
@@ -568,3 +571,40 @@ def colorcode_array(inp_array):
         rgb[inp_array==k,:] = colorDict[k]
 
     return rgb
+
+
+def add_colortable(n_out):
+    """ Add colortable to output GDAL Dataset """
+    colorTable = gdal.ColorTable()
+    for color in colorDict:
+        colorTable.SetColorEntry(color, colorDict[color] + (255,))
+    n_out.vrt.dataset.GetRasterBand(1).SetColorTable(colorTable)
+
+    return n_out
+
+def update_icemap_mosaic(inp_filename, inp_data, out_filename, out_domain, out_metadata):
+    if os.path.exists(out_filename):
+        mos_array = Nansat(out_filename)[1]
+    else:
+        mos_array = np.zeros(out_domain.shape(), np.uint8) + 255
+
+    # read classification data and reproject onto mosaic domain
+    n = Nansat(inp_filename)
+    if inp_data is None:
+        n.reproject_gcps()
+        n.reproject(out_domain)
+        inp_data = dict(arr=n[1], mask=n[2])
+
+    # put data into mosaic array
+    mos_array[inp_data['mask']==1] = inp_data['arr'][inp_data['mask']==1]
+
+    # export
+    n_out = Nansat.from_domain(out_domain)
+    n_out.add_band(array=mos_array, parameters={'name': 'classification'})
+    n_out.set_metadata(n.get_metadata())
+    n_out.set_metadata(out_metadata)
+
+    n_out = add_colortable(n_out)
+    n_out.export(out_filename, driver='GTiff', options=['COMPRESS=LZW'])
+
+    return inp_data
