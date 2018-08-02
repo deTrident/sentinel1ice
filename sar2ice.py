@@ -596,7 +596,8 @@ def update_icemap_mosaic(inp_filename, inp_data, out_filename, out_domain, out_m
         inp_data = dict(arr=n[1], mask=n[2])
 
     # put data into mosaic array
-    mos_array[inp_data['mask']==1] = inp_data['arr'][inp_data['mask']==1]
+    gpi = (inp_data['mask']==1) * (inp_data['arr'] < 255)
+    mos_array[gpi] = inp_data['arr'][gpi]
 
     # export
     n_out = Nansat.from_domain(out_domain)
