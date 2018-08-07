@@ -235,6 +235,7 @@ def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads, te
         print('File %s with texture features already exists.' % out_file)
         return out_file
 
+    print('Processing texture from ', inp_file)
     npz = np.load(inp_file)
     tfs = {}
     for pol in ['HH', 'HV']:
