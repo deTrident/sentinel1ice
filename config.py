@@ -1,13 +1,11 @@
 import os
 
 inputDirectory = '/Volumes/MacOS8TB/Archives/Sentinel-1/FramStrait/'
-inputDirectory = '/files/sentinel1a/'
 
 if not os.path.exists(inputDirectory):
     raise IOError('cannot find input directory %s' % inputDirectory)
 
 outputDirectory = '/Volumes/MacOS8TB/Process/sentinel1ice/FramStrait/'
-outputDirectory = '/files/sentinel1a/denoised/'
 if not os.path.exists(outputDirectory):
     os.mkdir(outputDirectory)
 
@@ -15,7 +13,6 @@ if not os.path.exists(outputDirectory):
 sourceType = 'AARI'
 
 iceChartDirectory = '/Volumes/MacOS8TB/Archives/Ice_chart/AARI'
-iceChartDirectory = '/files/sentinel1a/denoised/'
 if sourceType != 'manual':
     if not os.path.exists(iceChartDirectory):
         raise IOError('cannot find ice chart directory %s' % iceChartDirectory)
@@ -27,16 +24,13 @@ classifierFilename = '/Data/sat/downloads/sentinel1/rf_FramStrait_AARI.pickle'
 # limit file list for denosing by the following parameters:
 minDate = None
 maxDate = None
-wildcard = 'S1A*'
+wildcard = '*'
 
-# boolean, generate quicklook of denoised image?
-quicklook = False
+sigma0_max = {'HH':  +2.0, 'HV':  -7.0}
+sigma0_min = {'HH': -36.0, 'HV': -35.0}
 
-# boolean, unzip input files and keep them?
-unzipInput = False
-
-gamma0_max = {'HH':  +1.0, 'HV':  -8.0}
-gamma0_min = {'HH': -31.0, 'HV': -32.0}
+# angular dependency for deformed FYI (Reference; doi: 10.1109/TGRS.2017.2721981)
+angularDependency = {'HH':-0.24, 'HV':-0.16}
 
 # must be positive integer
 stepSize = 25
@@ -50,8 +44,17 @@ grayLevel = 64
 # must be in ["averagedGLCM", "averagedTFs"]
 textureFeatureAlgorithm = 'averagedGLCM'
 
-# must be o (no multiprocessing) or positive integer < os.cpu_count()
-numberOfThreads = 6
+# must be 0 (no multiprocessing) or positive integer < os.cpu_count()
+numberOfThreads = 3
 
-# boolean, force processing?
-force = True
+# boolean, generate quicklook of denoised image?
+quicklook = True
+
+# boolean, unzip input files and keep them?
+unzipInput = False
+
+# boolean, land masking?
+landmask = True
+
+# boolean, force reprocessing?
+force = False

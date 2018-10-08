@@ -12,7 +12,7 @@ from scipy.ndimage import maximum_filter
 import gdal
 
 from nansat import Nansat, Domain
-from sentinel1denoised.S1_TOPS_GRD_NoiseCorrection import Sentinel1Image
+from sentinel1corrected.S1_TOPS_GRD_NoiseCorrection import Sentinel1Image
 
 clf = None
 
@@ -201,7 +201,8 @@ def get_texture_features(iarray, ws, stp, threads, alg):
     return np.swapaxes(harImageAnis.T, 1, 2)
 
 
-def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads, textureFeatureAlgorithm, quicklook, force=False):
+def save_texture_features_old(inp_file, subwindowSize, stepSize, numberOfThreads,
+                          textureFeatureAlgorithm, quicklook, force):
     """ Wrapper around get_texture_features. Load input file, calculate TF, save output
     Parameters
     ----------
@@ -220,6 +221,8 @@ def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads, te
                             distance by taking mean at GLCM level
         quicklook : bool
             generate quicklooks?
+        force : bool
+            force reprocessing?
 
     Returns
     -------
@@ -230,7 +233,7 @@ def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads, te
             COLS = rows of input image / stp
     """
 
-    out_file = inp_file.replace('_gamma0','_texture_features')
+    out_file = inp_file.replace('_sigma0','_texture_features')
     if os.path.exists(out_file) and not force:
         print('File %s with texture features already exists.' % out_file)
         return out_file
@@ -241,15 +244,136 @@ def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads, te
     for pol in ['HH', 'HV']:
         print('Compute texture %s features from %s' % (pol, inp_file))
         # get texture features
-        tfs[pol] = get_texture_features(npz['gamma0_%s' % pol], subwindowSize, stepSize, numberOfThreads, textureFeatureAlgorithm)
-        if quicklook:
-            # save each texture feature in a PNG
-            for i, tf in enumerate(tfs[pol]):
-                vmin, vmax = np.percentile( tf[np.isfinite(tf)], (2.5, 97.5) )
-                plt.imsave(out_file.replace('_texture_features.npz','_%s_har%02d.png' % (pol, i)),
-                            tf, vmin=vmin, vmax=vmax )
+        tfs[pol] = get_texture_features(npz['sigma0_%s' % pol], subwindowSize, stepSize,
+                                        numberOfThreads, textureFeatureAlgorithm)
+        
+    if quicklook:
+        # save each texture feature in a PNG
+        for li in range(13):
+            valid = np.isfinite(tfs['HH'][li] * tfs['HV'][li])
+            for pol in ['HH', 'HV']:
+                tf = tfs[pol][li]
+                vmin, vmax = np.percentile(tf[valid], (1, 99))
+                plt.imsave(out_file.replace('_texture_features.npz','_%s_har%02d.png' % (pol, li)),
+                           tf, vmin=vmin, vmax=vmax )
+
     # save the results as a npz file
-    np.savez_compressed(out_file, textureFeatures=tfs, incidenceAngle=npz['incidenceAngle'])
+    np.savez_compressed(out_file, textureFeatures=tfs)
+
+    return out_file
+
+
+def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads,
+                          textureFeatureAlgorithm, quicklook, force):
+    """ Wrapper around get_texture_features. Load input file, calculate TF, save output
+    Parameters
+    ----------
+        inp_file : str
+            name of inputfile
+        subwindowSize : int
+            size of subwindow
+        stepSize : int
+            step of sub-window floating
+        numberOfThreads : int
+            number of parallel processes
+        textureFeatureAlgorithm : str
+            'averagedGLCM' : compute averaged texture from multi-coocurrence
+                             distance by taking mean at Haralick feature level
+            'averagedTFs' : compute averaged texture from multi-coocurrence
+                            distance by taking mean at GLCM level
+        quicklook : bool
+            generate quicklooks?
+        force : bool
+            force reprocessing?
+
+    Returns
+    -------
+        harImageAnis : ndarray
+            [13 x ROWS x COLS] array with texture features descriptors
+            13 - nuber of texture features
+            ROWS = rows of input image / stp
+            COLS = rows of input image / stp
+    """
+
+    out_file = inp_file.replace('_sigma0','_texture_features')
+    if os.path.exists(out_file) and not force:
+        print('File %s with texture features already exists.' % out_file)
+        return out_file
+
+    print('Processing texture from ', inp_file)
+    npz = np.load(inp_file)
+    tfs = {}
+    tmp_tfs = {}
+    for pol in ['HH', 'HV']:
+        for dtype in ['raw', 'denoised']:
+            key = '%s_%s' % (pol, dtype)
+            # get texture features
+            data = npz['sigma0_%s' % key]
+            swi = npz['subswathIndices']
+            nSW = np.unique(swi)
+            nRows = data.shape[0]//stepSize
+            nCols = data.shape[1]//stepSize
+            tmp_tfs[key] = np.ones((5, 13, nRows, nCols)) * np.nan
+            for iSW in nSW[nSW>0]:
+                print('Compute %s texture features of the subswath %s' % (key, iSW))
+                w = np.reshape(
+                        [(swi[r*stepSize:(r+1)*stepSize,c*stepSize:(c+1)*stepSize]==iSW).sum()
+                         for (r,c) in np.ndindex(nRows, nCols)], (nRows, nCols)) / stepSize**2
+                w = np.tile(w, (13,1,1))
+                ri = np.where(swi==iSW)[1]
+                riMin, riMax = ri.min()//stepSize*stepSize, (ri.max()//stepSize+1)*stepSize
+                sswd = np.copy(data[:,riMin:riMax]).astype(np.int16)
+                sswi = np.copy(swi[:,riMin:riMax])
+                sswd[(sswi!=iSW) * (sswi!=0)] = -1
+                nr = sswd.shape[1]
+                for li in range(sswd.shape[0]):
+                    fi = np.where(sswd[li]!=-1)[0]
+                    if len(fi)==0:
+                        continue
+                    fiMin, fiMax = fi.min(), fi.max()
+                    if fiMax!=(nr-1):
+                        sswd[li][fiMax+1:nr] = sswd[li][fiMax:fiMax-(nr-fiMax)+1:-1]
+                    if fiMin!=0:
+                        sswd[li][0:fiMin] = sswd[li][fiMin:fiMin+fiMin]
+                tmp_tfs[key][iSW-1,:,:,riMin//stepSize:riMax//stepSize] = ( get_texture_features(
+                        sswd, subwindowSize, stepSize, numberOfThreads, textureFeatureAlgorithm)
+                    * w[:,:,riMin//stepSize:riMax//stepSize] )
+            invalid = np.isnan(np.nanmean(tmp_tfs[key],axis=0))
+            tmp_tfs[key] = np.nansum(tmp_tfs[key],axis=0)
+            tmp_tfs[key][invalid] = np.nan
+        tfs[pol] = np.copy(tmp_tfs[pol+'_denoised'])
+        # the thrid tfs (correlation) should be taken from the raw image
+        tfs[pol][2] = np.copy(tmp_tfs[pol+'_raw'][2])
+
+    # estimate scaling factor from HH, then apply it to the last two tfs of raw HV
+    r = tmp_tfs['HH_denoised'][-1]/tmp_tfs['HH_raw'][-1]
+    p = np.nanmedian(r[r!=1])   # r!=1 in the first subswath
+    w1 = np.reshape([(swi[r*stepSize:(r+1)*stepSize,c*stepSize:(c+1)*stepSize]==1).sum()
+             for (r,c) in np.ndindex(nRows, nCols)], (nRows, nCols)) / stepSize**2
+    w2 = np.reshape([(swi[r*stepSize:(r+1)*stepSize,c*stepSize:(c+1)*stepSize]>=2).sum()
+             for (r,c) in np.ndindex(nRows, nCols)], (nRows, nCols)) / stepSize**2
+    tfs['HV'][-1] = tmp_tfs['HV_raw'][-1]*w1*p + tmp_tfs['HV_raw'][-1]*w2
+    r = tmp_tfs['HH_denoised'][-2]/tmp_tfs['HH_raw'][-2]
+    p = np.nanmedian(r[r!=1])   # r!=1 in the first subswath
+    w1 = np.reshape([(swi[r*stepSize:(r+1)*stepSize,c*stepSize:(c+1)*stepSize]==1).sum()
+             for (r,c) in np.ndindex(nRows, nCols)], (nRows, nCols)) / stepSize**2
+    w2 = np.reshape([(swi[r*stepSize:(r+1)*stepSize,c*stepSize:(c+1)*stepSize]>=2).sum()
+             for (r,c) in np.ndindex(nRows, nCols)], (nRows, nCols)) / stepSize**2
+    tfs['HV'][-2] = tmp_tfs['HV_raw'][-2]*w1*p + tmp_tfs['HV_raw'][-2]*w2
+
+    # save the results as a npz file
+    np.savez_compressed(out_file, textureFeatures=tfs)
+
+    if quicklook:
+        # save each texture feature in a PNG
+        for li in range(tfs['HH'].shape[0]):
+            valid = np.isfinite(tfs['HH'][li] * tfs['HV'][li])
+            for pol in ['HH', 'HV']:
+                tf = tfs[pol][li]
+                vmin, vmax = np.percentile(tf[valid], (1, 99))
+                plt.imsave(out_file.replace('_texture_features.npz','_%s_har%02d.png' % (pol, li)),
+                           tf, vmin=vmin, vmax=vmax )
+
     return out_file
 
 
@@ -260,9 +384,9 @@ def get_map(s1i,env):
     ----------
         s1i : Sentinel1Image
             Nansat class with SAR data
-        env['gamma0_min'] : list of floats
+        env['sigma0_min'] : list of floats
             minimum values used for scaling to gray levels
-        env['gamma0_max'] : list of floats
+        env['sigma0_max'] : list of floats
             maximum values used for scaling to gray levels
         env['grayLevel'] : int
             number of gray levels
@@ -282,8 +406,8 @@ def get_map(s1i,env):
         s1i : Sentinel1Image
             Nansat class with processed data
     '''
-    gamma0_max = env['gamma0_max']
-    gamma0_min = env['gamma0_min']
+    sigma0_max = env['sigma0_max']
+    sigma0_min = env['sigma0_min']
     l   = env['grayLevel']    # gray-level. 32 or 64.
     ws  = env['subwindowSize']    # 1km pixel spacing (40m * 25 = 1000m)
     stp = env['stepSize']    # step size
@@ -292,18 +416,18 @@ def get_map(s1i,env):
     classifierFilename = env['classifierFilename']
 
     print('*** denoising ...')
-    gamma0 = {'HH':[],'HV':[]}
+    sigma0 = {'HH':[],'HV':[]}
     for pol in ['HH','HV']:
         s1i.add_band(array=(s1i.thermalNoiseRemoval_dev(polarization=pol, windowSize=ws)
                             / np.cos(np.deg2rad(s1i['incidence_angle']))),
-                     parameters={'name': 'gamma0_%s_denoised' % pol})
+                     parameters={'name': 'sigma0_%s_denoised' % pol})
 
     print('*** texture feature extraction ...')
     landmask = maximum_filter(s1i.landmask(skipGCP=4), ws)
     tfs = {'HH':[],'HV':[]}
     for pol in ['HH','HV']:
-        grayScaleImage = convert2gray(10*np.log10(s1i['gamma0_%s_denoised' % pol]),
-                                      gamma0_min[pol], gamma0_max[pol], l)
+        grayScaleImage = convert2gray(10*np.log10(s1i['sigma0_%s_denoised' % pol]),
+                                      sigma0_min[pol], sigma0_max[pol], l)
         grayScaleImage[landmask] = 0
         tfs[pol] = get_texture_features(grayScaleImage, ws, stp, threads, tfAlg)
     s1i.resize(factor=1./stp)
@@ -429,14 +553,15 @@ def julian_date(YYYYMMDDTHHMMSS):
     return dayFraction + day
 
 
-def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel, gamma0_min, gamma0_max, quicklook, force=False, get_landmask=False):
+def denoise_old(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel,
+            sigma0_min, sigma0_max, quicklook, force, get_landmask):
     """ Denoise input file """
     ifilename = os.path.split(input_file)[1]
     ID = ifilename.split('.')[0]
     wdir = os.path.join(outputDirectory, ID)
     if not os.path.exists(wdir):
         os.mkdir(wdir)
-    ofile = os.path.join(wdir, ID+'_gamma0.npz')
+    ofile = os.path.join(wdir, ID+'_sigma0.npz')
     if os.path.exists(ofile) and not force:
         print('Processed file %s already exists.' % ofile)
         return ofile
@@ -451,64 +576,144 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
     results = dict()
     s1i = Sentinel1Image(ifilename)
     s1i.reproject_gcps()
+
+    # landmask generation
     if get_landmask:
-        landmask = s1i.landmask(skipGCP=1).astype(np.uint8)
+        landmask = maximum_filter(s1i.landmask(skipGCP=4).astype(np.uint8), subwindowSize)
     else:
-        landmask = np.zeros(s1i.shape())
+        landmask = np.zeros(s1i.shape(), dtype=np.uint8)
+    s1i.add_band(array=landmask, parameters={'name':'landmask'})
 
     # denoise dual-pol images
     for pol in ['HH','HV']:
-        print('Denoising for %s polarization image in %s' % (pol, ifilename))
-        s1i.add_band(array=s1i.rawSigma0Map(polarization=pol),
-                     parameters={'name':'sigma0_%s_original' % pol})
-        s1i.add_band(array=(s1i.thermalNoiseRemoval_dev(polarization=pol, windowSize=subwindowSize)
-                            / np.cos(np.deg2rad(s1i['incidence_angle']))),
-                     parameters={'name':'gamma0_%s_denoised' % pol})
-    # landmask generation.
-    s1i.add_band(array=maximum_filter(landmask, subwindowSize),
-                 parameters={'name':'landmask'})
-    # compute histograms and apply gray level scaling
+        print('Denoising for %s polarization image from %s' % (pol, ifilename))
+        s1i.add_band(array=s1i.texturalNoiseRemoval(polarization=pol, windowSize=subwindowSize),
+                     parameters={'name':'sigma0_%s_denoised' % pol})
+
+    # compute histograms, then apply angular dependency correction and gray level scaling
     bin_edges = np.arange(-40.0,+10.1,0.1)
     for pol in ['HH','HV']:
+        # angular dependency for deformed FYI (Reference; doi: 10.1109/TGRS.2017.2721981)
+        angularDependency = {'HH':-0.24, 'HV':-0.16}
         valid = (s1i['landmask']!=1)
-        sigma0dB = 10*np.log10(s1i['sigma0_%s_original' % pol])
-        results['original_sigma0_%s_hist' % pol] = np.histogram(
+        sigma0dB = ( 10*np.log10(s1i['sigma0_%s_denoised' % pol])
+                     - (angularDependency[pol] * (s1i['incidence_angle'] - 19.)) )
+        results['sigma0_%s_hist' % pol] = np.histogram(
             sigma0dB[np.isfinite(sigma0dB) * valid], bins=bin_edges )
-        gamma0dB = 10*np.log10(s1i['gamma0_%s_denoised' % pol])
-        results['denoised_gamma0_%s_hist' % pol] = np.histogram(
-            gamma0dB[np.isfinite(gamma0dB) * valid], bins=bin_edges )
-        results['gamma0_%s' % pol] = convert2gray(gamma0dB, gamma0_min[pol], gamma0_max[pol], grayLevel)
-        results['gamma0_%s' % pol][np.logical_not(valid)] = 0
+        results['sigma0_%s' % pol] = convert2gray(sigma0dB, sigma0_min[pol], sigma0_max[pol], grayLevel)
+        results['sigma0_%s' % pol][np.logical_not(valid)] = 0
 
-    s1i.resize(factor=1./stepSize)
-    # incidence angle
-    results['incidenceAngle'] = s1i['incidence_angle']
     # save the results as a npz file
     np.savez_compressed(ofile, **results)
 
-
+    # generate quicklook
     if quicklook:
-        # generate quicklook
+        s1i.resize(factor=1./stepSize)
+        valid = ( (s1i['landmask']!=1)
+                  * np.isfinite(10*np.log10(s1i['sigma0_HH_denoised']))
+                  * np.isfinite(10*np.log10(s1i['sigma0_HV_denoised'])) )
         for pol in ['HH','HV']:
-            valid = (s1i['landmask']!=1)
-            s1i.export(ofile.replace('_gamma0.npz','_original_sigma0_%s.tif' % pol),
-                       bands=[s1i.get_band_number('sigma0_%s_original' % pol)], driver='GTiff')
-            s1i.export(ofile.replace('_gamma0.npz','_denoised_gamma0_%s.tif' % pol),
-                       bands=[s1i.get_band_number('gamma0_%s_denoised' % pol)], driver='GTiff')
-            sigma0dB = 10*np.log10(s1i['sigma0_%s_original' % pol])
+            s1i.export(ofile.replace('_sigma0.npz','_sigma0_%s.tif' % pol),
+                       bands=[s1i.get_band_number('sigma0_%s_denoised' % pol)], driver='GTiff')
+            sigma0dB = 10*np.log10(s1i['sigma0_%s_denoised' % pol])
             vmin, vmax = np.percentile(sigma0dB[np.isfinite(sigma0dB) * valid], (1,99))
-            plt.imsave( ofile.replace('_gamma0.npz','_original_sigma0_%s.png' % pol),
+            plt.imsave( ofile.replace('_sigma0.npz','_sigma0_%s.png' % pol),
                         sigma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
-            gamma0dB = 10*np.log10(s1i['gamma0_%s_denoised' % pol])
-            vmin, vmax = np.percentile(gamma0dB[np.isfinite(gamma0dB) * valid], (1,99))
-            plt.imsave( ofile.replace('_gamma0.npz','_denoised_gamma0_%s.png' % pol),
-                        gamma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
-        # clean up
-        del s1i
-        if os.path.exists(ifilename) and unzipInput:
-            shutil.rmtree(ifilename)
+
+    # clean up
+    del s1i
+    if os.path.exists(ifilename) and unzipInput:
+        shutil.rmtree(ifilename)
 
     return ofile
+
+
+def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel,
+            sigma0_min, sigma0_max, angularDependency, quicklook, force, get_landmask):
+    """ Denoise input file """
+    ifilename = os.path.split(input_file)[1]
+    ID = ifilename.split('.')[0]
+    wdir = os.path.join(outputDirectory, ID)
+    if not os.path.exists(wdir):
+        os.mkdir(wdir)
+    ofile = os.path.join(wdir, ID+'_sigma0.npz')
+    if os.path.exists(ofile) and not force:
+        print('Processed file %s already exists.' % ofile)
+        return ofile
+
+    if unzipInput:
+        with zipfile.ZipFile(ifile, "r") as z:
+            z.extractall()
+        ifilename = ifilename[:-3]+'SAFE'
+    else:
+        ifilename = input_file
+
+    results = dict()
+    s1i = Sentinel1Image(ifilename)
+    s1i.reproject_gcps()
+
+    # landmask generation
+    if get_landmask:
+        landmask = maximum_filter(s1i.landmask(skipGCP=4).astype(np.uint8), subwindowSize)
+    else:
+        landmask = np.zeros(s1i.shape(), dtype=np.uint8)
+    s1i.add_band(array=landmask, parameters={'name':'landmask'})
+    del landmask
+
+    # subswath indices
+    results['subswathIndices'] = s1i.subswathIndexMap('HH')
+
+    # denoise dual-pol images
+    for pol in ['HH','HV']:
+        print('Denoising for %s polarization image from %s' % (pol, ifilename))
+        s1i.add_band(array=s1i.rawSigma0Map(polarization=pol),
+                     parameters={'name':'sigma0_%s_raw' % pol})
+        s1i.add_band(array=s1i.texturalNoiseRemoval(polarization=pol, windowSize=subwindowSize),
+                     parameters={'name':'sigma0_%s_denoised' % pol})
+
+    # compute histograms, then apply angular dependency correction and gray level scaling
+    bin_edges = np.arange(-40.0,+10.1,0.1)
+    valid = (s1i['landmask']!=1)
+    inc = s1i['incidence_angle']
+    for pol in ['HH','HV']:
+        for dtype in ['raw', 'denoised']:
+            key = '%s_%s' % (pol, dtype)
+            sigma0dB = 10*np.log10(s1i['sigma0_%s' % key]) - (angularDependency[pol] * (inc - 19.))
+            results['sigma0_%s_hist' % key] = np.histogram(
+                sigma0dB[np.isfinite(sigma0dB) * valid], bins=bin_edges)
+            results['sigma0_%s' % key] = convert2gray(
+                sigma0dB, sigma0_min[pol], sigma0_max[pol], grayLevel)
+            results['sigma0_%s' % key][np.logical_not(valid)] = 0
+    del valid, inc, sigma0dB
+
+    # save the results as a npz file
+    np.savez_compressed(ofile, **results)
+
+    # generate quicklook
+    if quicklook:
+        s1i.resize(factor=1./stepSize)
+        valid = ( (s1i['landmask']!=1)
+                  * np.isfinite(10*np.log10(s1i['sigma0_HH_raw']))
+                  * np.isfinite(10*np.log10(s1i['sigma0_HH_denoised']))
+                  * np.isfinite(10*np.log10(s1i['sigma0_HV_raw']))
+                  * np.isfinite(10*np.log10(s1i['sigma0_HV_denoised'])) )
+        for pol in ['HH','HV']:
+            for dtype in ['raw', 'denoised']:
+                key = '%s_%s' % (pol, dtype)
+                s1i.export(ofile.replace('_sigma0.npz','_sigma0_%s.tif' % key),
+                           bands=[s1i.get_band_number('sigma0_%s' % key)], driver='GTiff')
+                sigma0dB = 10*np.log10(s1i['sigma0_%s' % key])
+                vmin, vmax = np.percentile(sigma0dB[np.isfinite(sigma0dB) * valid], (1,99))
+                plt.imsave( ofile.replace('_sigma0.npz','sigma0_%s.png' % key),
+                            sigma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
+
+    # clean up
+    del s1i
+    if os.path.exists(ifilename) and unzipInput:
+        shutil.rmtree(ifilename)
+
+    return ofile
+
 
 def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, source, quicklook=False, force=False):
     """ Load texture features, apply classifier and save ice map """
@@ -566,6 +771,7 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
 
     return out_filename
 
+
 def colorcode_array(inp_array):
     rgb = np.zeros((inp_array.shape[0], inp_array.shape[1], 3), 'uint8')
     for k in colorDict.keys():
@@ -582,6 +788,7 @@ def add_colortable(n_out):
     n_out.vrt.dataset.GetRasterBand(1).SetColorTable(colorTable)
 
     return n_out
+
 
 def update_icemap_mosaic(inp_filename, inp_data, out_filename, out_domain, out_metadata):
     if os.path.exists(out_filename):
