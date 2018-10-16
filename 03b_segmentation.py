@@ -4,20 +4,17 @@ import matplotlib;    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os, glob, pickle
 import numpy as np
-from sklearn import preprocessing
+from sklearn.preprocessing import QuantileTransformer
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from nansat import Nansat
 import config as cfg
 
-# set up parameters for clustering
-n_components = 7
-n_clusters = 8
-# read configuration
+
 # listup texture feature files
 ifiles = sorted(glob.glob(cfg.outputDirectory + '*/*_texture_features.npz'))
-#ifiles = [fn for fn in ifiles
-#          if os.path.exists(fn.replace('_texture_features.npz','_reprojected_ice_chart.tif'))]
+if (cfg.minDate!=None) and (cfg.maxDate!=None):
+    ifiles = [f for f in ifiles if cfg.minDate <= os.path.split(f)[-1][17:25] <= cfg.maxDate]
 # import and stack
 features_all = []
 print('*** Importing files from:')
@@ -26,16 +23,17 @@ for li, ifile in enumerate(ifiles):
     npz = np.load(ifile)
     tfsHH = npz['textureFeatures'].item()['HH']
     tfsHV = npz['textureFeatures'].item()['HV']
-    incAng = npz['incidenceAngle'][np.newaxis,:,:]
-    features_all.append(np.vstack([tfsHH,tfsHV,incAng]).reshape(27,np.prod(incAng.shape)))
+    features_all.append(np.vstack([tfsHH,tfsHV]).reshape(26,np.prod(tfsHH.shape[1:])))
 features_all = np.hstack(features_all).T
 features_all = features_all[np.isfinite(features_all.sum(axis=1))]
 # fit PCA and KMeans
 print('*** Optimizing PCA and Kmeans')
-scaler = preprocessing.QuantileTransformer(output_distribution='normal').fit(features_all)
-pca = PCA(n_components=n_components).fit(scaler.transform(features_all))
-kmeans = KMeans(n_clusters=n_clusters, n_jobs=cfg.numberOfThreads).fit(pca.transform(scaler.transform(features_all)))
-pickle.dump([scaler, pca, kmeans], open(cfg.kmeansFilename, "wb" ))
+scaler = QuantileTransformer(output_distribution='normal').fit(features_all)
+pca = PCA(n_components=26).fit(scaler.transform(features_all))
+n_components = len(np.where(np.cumsum(pca.explained_variance_ratio_) < cfg.pcaVarThres)[0])+1
+kmeans = KMeans(n_clusters=9, n_jobs=cfg.numberOfThreads).fit(
+             pca.transform(scaler.transform(features_all))[:,:n_components])
+pickle.dump([scaler, pca, n_components, kmeans], open(cfg.kmeansFilename, "wb" ))
 # apply clustering
 print('*** Exporting files to:')
 for li, ifile in enumerate(ifiles):
@@ -44,16 +42,17 @@ for li, ifile in enumerate(ifiles):
     npz = np.load(ifile)
     tfsHH = npz['textureFeatures'].item()['HH']
     tfsHV = npz['textureFeatures'].item()['HV']
-    incAng = npz['incidenceAngle'][np.newaxis,:,:]
     imgSize = tfsHH.shape[1:]
-    features = np.vstack([tfsHH,tfsHV,incAng]).reshape(27,np.prod(imgSize)).T
+    features = np.vstack([tfsHH,tfsHV]).reshape(26,np.prod(imgSize)).T
     gpi = np.isfinite(features.sum(axis=1))
-    kmeansZones = np.ones(np.prod(imgSize)) * np.nan
-    kmeansZones[gpi] = kmeans.predict(pca.transform(scaler.transform(features[gpi])))
+    kmeansZones = np.zeros(np.prod(imgSize))    # 0 is reserved for void cells
+    kmeansZones[gpi] = 1 + kmeans.predict(
+                               pca.transform(scaler.transform(features[gpi]))[:,:n_components])
     kmeansZones = kmeansZones.reshape(imgSize)
-    nansatObjGamma0 = Nansat(ifile.replace('_texture_features.npz','_denoised_gamma0_HH.tif'))
-    if nansatObjGamma0.shape() != imgSize:
-        nansatObjGamma0.crop(0,0,imgSize[1],imgSize[0])
-    nansatObjCluster = Nansat(array=kmeansZones, domain=nansatObjGamma0)
+    nansatObjSigma0 = Nansat(ifile.replace('_texture_features.npz','_sigma0_HH_denoised.tif'))
+    if nansatObjSigma0.shape() != imgSize:
+        nansatObjSigma0.crop(0,0,imgSize[1],imgSize[0])
+    nansatObjCluster = Nansat.from_domain(array=kmeansZones.astype(np.uint8), domain=nansatObjSigma0)
     nansatObjCluster.export(ofile, bands=[1], driver='GTiff')
-    plt.imsave(ofile.replace('.tif','.png'), kmeansZones)
+    if cfg.quicklook:
+        plt.imsave(ofile.replace('.tif','.png'), kmeansZones, cmap='tab10')

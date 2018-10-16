@@ -25,7 +25,7 @@ ifiles = glob.glob(os.path.join(cfg.inputDirectory,cfg.wildcard))
 date_key = lambda x: x.split('/')[-1].split('_')[4]
 ifiles = sorted(ifiles, key=date_key, reverse=True)
 if (cfg.minDate!=None) and (cfg.maxDate!=None):
-    ifiles = [ifile for ifile in ifiles if cfg.minDate <= os.path.split(ifile)[-1][17:25] <= cfg.maxDate]
+    ifiles = [f for f in ifiles if cfg.minDate <= os.path.split(f)[-1][17:25] <= cfg.maxDate]
 
 if cfg.numberOfThreads == 0:
     # run denosing without threads

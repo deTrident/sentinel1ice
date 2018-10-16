@@ -3,21 +3,30 @@ import os, sys, glob, pickle
 from datetime import datetime
 from multiprocessing import Pool
 from operator import add
-
 import numpy as np
 import mahotas
 import matplotlib.pyplot as plt
 from skimage.feature import greycomatrix
 from scipy.ndimage import maximum_filter
 import gdal
-
 from nansat import Nansat, Domain
 from sentinel1corrected.S1_TOPS_GRD_NoiseCorrection import Sentinel1Image
-
 clf = None
 
-colorDict = {   0:(  0, 100, 255),    # Ice free
+
+colorDict = {
+    'AARI': {   0:( 39, 189, 255),    # Ice free
+               82:(  0,  77, 255),    # Nilas
+               83:(244,   0, 255),    # Young ice
+               86:( 43, 191, 141),    # First year ice
+               95:(122,   0,   0),    # Old ice
+               99:(255, 255, 255),    # Undefined
+              107:(150, 150, 150),    # Fast ice
+              255:(255, 255, 255),    # void cell in texture features or land
+            },
+    'NIC':  {   0:(  0, 100, 255),    # Ice free
                 1:(150, 200, 255),    # <1/10 ice of unspecified SoD (open water)
+                2:(150, 200, 255),    # <1/10 ice (bergy water)
                81:(240, 210, 250),    # New ice
                82:(255, 138, 255),    # Nilas, Ice Rind
                83:(170,  40, 240),    # Young ice
@@ -36,7 +45,8 @@ colorDict = {   0:(  0, 100, 255),    # Ice free
                99:(255, 255, 255),    # Ice of undefined SoD
               107:(150, 150, 150),    # Fast ice of unspecified SoD
               108:(255,   0,   0),    # Iceberg
-              255:(  0,   0,   0),    # void cell in texture features (land, scene border)
+              255:(255, 255, 255),    # void cell in texture features or land
+            }
 }
 
 
@@ -377,85 +387,22 @@ def save_texture_features(inp_file, subwindowSize, stepSize, numberOfThreads,
     return out_file
 
 
-def get_map(s1i,env):
-    '''Get raster map with classification results
+def get_map(input_file):
+    
+    import config as cfg
+    ID = input_file.split('/')[-1].split('.')[0]
+    denoise(input_file, cfg.outputDirectory, cfg.unzipInput, cfg.subwindowSize, cfg.stepSize,
+            cfg.grayLevel, cfg.sigma0_min, cfg.sigma0_max, cfg.angularDependency,
+            cfg.quicklook, cfg.force, cfg.landmask)
+    input_file = os.path.join(cfg.outputDirectory, ID, ID+'_sigma0.npz')
+    save_texture_features(input_file, cfg.subwindowSize, cfg.stepSize, cfg.numberOfThreads,
+                          cfg.textureFeatureAlgorithm, cfg.quicklook, cfg.force)
+    input_file = os.path.join(cfg.outputDirectory, ID, ID+'_texture_features.npz')
+    nansat_filename = os.path.join(cfg.outputDirectory, ID, ID+'_sigma0_HH_denoised.tif')
+    save_ice_map(input_file, nansat_filename, cfg.classifierFilename, cfg.numberOfThreads,
+                 cfg.sourceType, cfg.quicklook, cfg.force)
 
-    Parameters
-    ----------
-        s1i : Sentinel1Image
-            Nansat class with SAR data
-        env['sigma0_min'] : list of floats
-            minimum values used for scaling to gray levels
-        env['sigma0_max'] : list of floats
-            maximum values used for scaling to gray levels
-        env['grayLevel'] : int
-            number of gray levels
-        env['subwindowSize'] : int
-            sub-window size to calculate textures in
-        env['stepSize'] : int
-            step of sub-window floating
-        env['textureFeatureAlgorithm'] : str
-            texture feature extraction algorithm.
-            choose from ['averagedGLCM','averagedTFs']
-        env['numberOfThreads'] : int
-            number of parallell processes
-        env['classifierFilename'] : str
-            name of file where SVM is stored
-    Returns
-    -------
-        s1i : Sentinel1Image
-            Nansat class with processed data
-    '''
-    sigma0_max = env['sigma0_max']
-    sigma0_min = env['sigma0_min']
-    l   = env['grayLevel']    # gray-level. 32 or 64.
-    ws  = env['subwindowSize']    # 1km pixel spacing (40m * 25 = 1000m)
-    stp = env['stepSize']    # step size
-    tfAlg = env['textureFeatureAlgorithm']
-    threads = env['numberOfThreads']
-    classifierFilename = env['classifierFilename']
-
-    print('*** denoising ...')
-    sigma0 = {'HH':[],'HV':[]}
-    for pol in ['HH','HV']:
-        s1i.add_band(array=(s1i.thermalNoiseRemoval_dev(polarization=pol, windowSize=ws)
-                            / np.cos(np.deg2rad(s1i['incidence_angle']))),
-                     parameters={'name': 'sigma0_%s_denoised' % pol})
-
-    print('*** texture feature extraction ...')
-    landmask = maximum_filter(s1i.landmask(skipGCP=4), ws)
-    tfs = {'HH':[],'HV':[]}
-    for pol in ['HH','HV']:
-        grayScaleImage = convert2gray(10*np.log10(s1i['sigma0_%s_denoised' % pol]),
-                                      sigma0_min[pol], sigma0_max[pol], l)
-        grayScaleImage[landmask] = 0
-        tfs[pol] = get_texture_features(grayScaleImage, ws, stp, threads, tfAlg)
-    s1i.resize(factor=1./stp)
-    for pol in ['HH','HV']:
-        for li in range(13):
-            s1i.add_band(array=np.squeeze(tfs[pol][li,:,:]),
-                         parameters={'name': 'Haralick_%02d_%s' % (li+1, pol)})
-
-    print('*** applying classifier ...')
-    plk = pickle.load(open(classifierFilename, "rb" ))
-    if type(plk)==list:
-        scaler, clf = plk
-    else:
-        class dummy_class(object):
-            def transform(self, x):
-                return(x)
-        scaler = dummy_class()
-        clf = plk
-    clf.n_jobs = threads
-    features = np.vstack([tfs['HH'], tfs['HV'], s1i['incidence_angle'][np.newaxis,:,:]])
-    features = features.reshape((27,np.prod(s1i.shape()))).T
-    gpi = np.isfinite(features.sum(axis=1))
-    classImage = np.ones(np.prod(s1i.shape())) * np.nan
-    classImage[gpi] = clf.predict(scaler.transform(features[gpi,:]))
-    classImage = classImage.reshape(s1i.shape())
-    s1i.add_band(array=classImage, parameters={'name': 'class'})
-
-    return s1i
+    return os.path.join(cfg.outputDirectory, ID, ID+'_classified_%s.tif' % cfg.sourceType)
 
 
 def fixedPatchProc(inputDataArray,inputSWindexArray,function,windowSize):
@@ -533,7 +480,7 @@ def slidingPatchProc(inputDataArray,inputSWindexArray,function,windowSize):
     return outputDataArray[hWin:-hWin,hWin:-hWin]
 
 
-def julian_date(YYYYMMDDTHHMMSS):
+def modifiedJulianDate2000(YYYYMMDDTHHMMSS):
     if not isinstance(YYYYMMDDTHHMMSS, str):
         raise ValueError('input instance YYYYMMDDTHHMMSS must be string.')
     year = int(YYYYMMDDTHHMMSS[:4])
@@ -550,7 +497,7 @@ def julian_date(YYYYMMDDTHHMMSS):
             + np.floor( np.floor(year / 100.0) / 4.0 )
             + int(YYYYMMDDTHHMMSS[6:8])
             - 1524.5 )
-    return dayFraction + day
+    return dayFraction + day - 2400000.5 - 51544.5
 
 
 def denoise_old(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, grayLevel,
@@ -689,22 +636,21 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
     # save the results as a npz file
     np.savez_compressed(ofile, **results)
 
-    # generate quicklook
-    if quicklook:
-        s1i.resize(factor=1./stepSize)
-        valid = ( (s1i['landmask']!=1)
-                  * np.isfinite(10*np.log10(s1i['sigma0_HH_raw']))
-                  * np.isfinite(10*np.log10(s1i['sigma0_HH_denoised']))
-                  * np.isfinite(10*np.log10(s1i['sigma0_HV_raw']))
-                  * np.isfinite(10*np.log10(s1i['sigma0_HV_denoised'])) )
-        for pol in ['HH','HV']:
-            for dtype in ['raw', 'denoised']:
-                key = '%s_%s' % (pol, dtype)
-                s1i.export(ofile.replace('_sigma0.npz','_sigma0_%s.tif' % key),
-                           bands=[s1i.get_band_number('sigma0_%s' % key)], driver='GTiff')
+    s1i.resize(factor=1./stepSize)
+    valid = ( (s1i['landmask']!=1)
+              * np.isfinite(10*np.log10(s1i['sigma0_HH_raw']))
+              * np.isfinite(10*np.log10(s1i['sigma0_HH_denoised']))
+              * np.isfinite(10*np.log10(s1i['sigma0_HV_raw']))
+              * np.isfinite(10*np.log10(s1i['sigma0_HV_denoised'])) )
+    for pol in ['HH','HV']:
+        for dtype in ['raw', 'denoised']:
+            key = '%s_%s' % (pol, dtype)
+            s1i.export(ofile.replace('_sigma0.npz','_sigma0_%s.tif' % key),
+                       bands=[s1i.get_band_number('sigma0_%s' % key)], driver='GTiff')
+            if quicklook:
                 sigma0dB = 10*np.log10(s1i['sigma0_%s' % key])
                 vmin, vmax = np.percentile(sigma0dB[np.isfinite(sigma0dB) * valid], (1,99))
-                plt.imsave( ofile.replace('_sigma0.npz','sigma0_%s.png' % key),
+                plt.imsave( ofile.replace('_sigma0.npz','_sigma0_%s.png' % key),
                             sigma0dB, vmin=vmin, vmax=vmax, cmap='gray' )
 
     # clean up
@@ -715,7 +661,7 @@ def denoise(input_file, outputDirectory, unzipInput, subwindowSize, stepSize, gr
     return ofile
 
 
-def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, source, quicklook=False, force=False):
+def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, source, quicklook, force):
     """ Load texture features, apply classifier and save ice map """
     # get filenames
     out_filename = inp_filename.replace('_texture_features.npz', '_classified_%s.tif' % source)
@@ -724,26 +670,17 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
         return out_filename
 
     # import classifier
-    plk = pickle.load(open(classifier_filename, "rb" ))
-    if type(plk)==list:
-        scaler, clf = plk
-    else:
-        class dummy_class(object):
-            def transform(self, x):
-                return(x)
-        scaler = dummy_class()
-        clf = plk
+    clf = pickle.load(open(classifier_filename, "rb" ))
     clf.n_jobs = threads
 
     # get texture features
     npz = np.load(inp_filename)
     features = np.vstack([npz['textureFeatures'].item()['HH'],
-                          npz['textureFeatures'].item()['HV'],
-                          npz['incidenceAngle'][np.newaxis,:,:]])
+                          npz['textureFeatures'].item()['HV'],])
     imgSize = features.shape[1:]
-    features = features.reshape((27,np.prod(imgSize))).T
+    features = features.reshape((26,np.prod(imgSize))).T
     gpi = np.isfinite(features.sum(axis=1))
-    result = clf.predict(scaler.transform(features[gpi,:]))
+    result = clf.predict(features[gpi,:])
     classImage = np.ones(np.prod(imgSize)) * 255
     classImage[gpi] = result
     classImage = classImage.reshape(imgSize)
@@ -762,29 +699,29 @@ def save_ice_map(inp_filename, raw_filename, classifier_filename, threads, sourc
     ice_map = Nansat.from_domain(domain=raw_nansat, array=classImage.astype(np.uint8))
     ice_map.set_metadata(raw_nansat.get_metadata())
     ice_map.set_metadata('entry_title', 'S1_SAR_ICE_MAP')
-    ice_map = add_colortable(ice_map)
+    ice_map = add_colortable(ice_map, source)
     ice_map.export(out_filename, bands=[1], driver='GTiff')
 
     if quicklook:
-        rgb = colorcode_array(classImage)
+        rgb = colorcode_array(classImage, source)
         plt.imsave(out_filename.replace('.tif','.png'), rgb)
 
     return out_filename
 
 
-def colorcode_array(inp_array):
+def colorcode_array(inp_array, source):
     rgb = np.zeros((inp_array.shape[0], inp_array.shape[1], 3), 'uint8')
-    for k in colorDict.keys():
-        rgb[inp_array==k,:] = colorDict[k]
+    for k in colorDict[source].keys():
+        rgb[inp_array==k,:] = colorDict[source][k]
 
     return rgb
 
 
-def add_colortable(n_out):
+def add_colortable(n_out, source):
     """ Add colortable to output GDAL Dataset """
     colorTable = gdal.ColorTable()
-    for color in colorDict:
-        colorTable.SetColorEntry(color, colorDict[color] + (255,))
+    for color in colorDict[source]:
+        colorTable.SetColorEntry(color, colorDict[source][color] + (255,))
     n_out.vrt.dataset.GetRasterBand(1).SetColorTable(colorTable)
 
     return n_out
