@@ -2,9 +2,13 @@
 
 import os, glob, pickle, gdal
 import numpy as np
+from sklearn.preprocessing import QuantileTransformer
+from sklearn.decomposition import PCA
+from scipy.cluster import vq
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from scipy.optimize import curve_fit
+import scipy.ndimage as nd
 import config as cfg
 
 
@@ -24,6 +28,7 @@ if (cfg.minDate!=None) and (cfg.maxDate!=None):
               if cfg.minDate <= os.path.split(f)[-1][17:25] <= cfg.maxDate]
 
 # import and stack
+dist_from_boundary = 3
 features_all = []
 iceCodes_all = []
 print('*** Importing files from:')
@@ -33,45 +38,46 @@ for li, ifile in enumerate(ifiles):
     tfsHH = npz['textureFeatures'].item()['HH']
     tfsHV = npz['textureFeatures'].item()['HV']
     iceCode = gdal.Open(ifile).ReadAsArray()
-    features_all.append(np.vstack([tfsHH,tfsHV]).reshape(26,np.prod(iceCode.shape)))
-    iceCodes_all.append(iceCode.reshape(np.prod(iceCode.shape)))
+    for ic in np.unique(iceCode):
+        valid = (nd.distance_transform_edt(iceCode==ic) > dist_from_boundary)
+        features_all.append(np.vstack([tfsHH,tfsHV])[:,valid])
+        iceCodes_all.append(iceCode[valid])
 features_all = np.hstack(features_all).T
 iceCodes_all = np.hstack(iceCodes_all).T
 
-# exclude some ice codes (98:glacier, 99:undefined, 107:fast ice, 108:iceberg, 255:land)
-gpi = ( np.isfinite(features_all.sum(axis=1)) * (iceCodes_all != 98) * (iceCodes_all != 99)
+# generate sample mask for some ice codes
+# 98:glacier, 99:undefined, 107:fast ice, 108:iceberg, 255:land
+gpm = ( np.isfinite(features_all.sum(axis=1)) * (iceCodes_all != 98) * (iceCodes_all != 99)
         * (iceCodes_all != 107) * (iceCodes_all != 108) * (iceCodes_all != 255) )
-features_all = features_all[gpi]
-iceCodes_all = iceCodes_all[gpi]
+gpi = np.nonzero(gpm)[0]
 
-# exclude dark pixels in some ice classes by threasholding
-sigma0HH_all = []
-sigma0HV_all = []
-for li, ifile in enumerate(ifiles):
-    sigma0HH_all.append(Nansat(ifile.replace(ext, '_sigma0_HH_denoised.tif'))[1].flatten())
-    sigma0HV_all.append(Nansat(ifile.replace(ext, '_sigma0_HV_denoised.tif'))[1].flatten())
-sigma0HH_all = np.hstack(sigma0HH_all).T
-sigma0HV_all = np.hstack(sigma0HV_all).T
-sigma0HH_all = sigma0HH_all[gpi]
-sigma0HV_all = sigma0HV_all[gpi]
-bpi = (iceCodes_all==83) * (sigma0HV_all < 10**(-25/10))
-gpi = np.invert(bpi)
-features_all = features_all[gpi]
-iceCodes_all = iceCodes_all[gpi]
-sigma0HH_all = sigma0HH_all[gpi]
-sigma0HV_all = sigma0HV_all[gpi]
-bpi = (iceCodes_all==86) * (sigma0HV_all < 10**(-25/10))
-gpi = np.invert(bpi)
-features_all = features_all[gpi]
-iceCodes_all = iceCodes_all[gpi]
-sigma0HH_all = sigma0HH_all[gpi]
-sigma0HV_all = sigma0HV_all[gpi]
-bpi = (iceCodes_all==95) * (sigma0HV_all < 10**(-22/10))
-gpi = np.invert(bpi)
-features_all = features_all[gpi]
-iceCodes_all = iceCodes_all[gpi]
-sigma0HH_all = sigma0HH_all[gpi]
-sigma0HV_all = sigma0HV_all[gpi]
+# modify sample mask via PCA-Kmeans
+print('*** Filtering samples using PCA and K-means clustering.')
+numberOfPC = np.ceil(np.sqrt(features_all.shape[1])).astype(np.int)
+numberOfCluster = 10
+thres = {0:1.0, 82:1.0, 83:0.8, 86:0.8, 95:0.8}
+for ic in np.unique(iceCodes_all[gpm]):
+    try:
+        th = thres[ic]
+    except:
+        th = 0.8
+    if th==1.0:
+        continue
+    v = (iceCodes_all[gpi]==ic)
+    x = PCA(n_components=numberOfPC).fit_transform(
+            QuantileTransformer(output_distribution='normal').fit_transform(features_all[gpi][v]))
+    y = iceCodes_all[gpi][v]
+    codeBook = vq.kmeans(x, numberOfCluster)[0]
+    labelVec = vq.vq(x, codeBook)[0]
+    w = np.array([(labelVec==l).sum() for l in range(numberOfCluster)]) / len(labelVec)
+    numberOfClusterToUse = (np.cumsum(w[np.argsort(w)][::-1]) < th).sum() + 1
+    bi = np.argsort(w)[:numberOfCluster-numberOfClusterToUse]
+    bpi = gpi[v][np.array([lv in bi for lv in labelVec])]
+    gpm[bpi] = False
+
+# apply sample mask
+features_all = features_all[gpm]
+iceCodes_all = iceCodes_all[gpm]
 
 ### divide data into train/test set
 test_size = (1. - cfg.maxNumberOfSamplesToTrain/len(iceCodes_all))
@@ -79,6 +85,7 @@ if test_size <= 0:
     test_size = 0.3
 trainFeatures, testFeatures, trainZones, testZones = train_test_split(
     features_all, iceCodes_all, test_size=test_size)
+
 
 ### tune hyper-parameters
 print('*** Tuning hyper-parameters.')
